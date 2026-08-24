@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>骑手招聘助手 AI 工作台</title>
+<style>
+  :root {
+    --bg: #f3f5f7;
+    --panel: #ffffff;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --blue: #2563eb;
+    --teal: #0f766e;
+    --red: #dc2626;
+    --green: #16a34a;
+    --user: #2563eb;
+    --agent: #eef2f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .app { max-width: 1180px; margin: 0 auto; padding: 18px 16px 24px; height: 100vh; display: flex; flex-direction: column; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 12px;
+  }
+  .brand { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .services { display: flex; gap: 10px; flex-wrap: wrap; }
+  .service { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); }
+  .dot.up { background: var(--green); }
+  .service button { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer; }
+  .service button:hover { border-color: var(--blue); color: var(--blue); }
+  .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tab {
+    border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+    border-radius: 8px; padding: 9px 18px; font-size: 14px; cursor: pointer;
+  }
+  .tab.active { color: #fff; background: var(--blue); border-color: var(--blue); }
+  .panel { display: none; flex: 1; min-height: 0; }
+  .panel.active { display: flex; }
+  .chat-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .bubble { max-width: 76%; padding: 9px 12px; border-radius: 8px; line-height: 1.6; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+  .bubble.user { align-self: flex-end; background: var(--user); color: #fff; border-bottom-right-radius: 2px; }
+  .bubble.agent { align-self: flex-start; background: var(--agent); border-bottom-left-radius: 2px; }
+  .bubble .tag { font-size: 11px; color: var(--muted); display: block; margin-top: 4px; }
+  .thinking { font-size: 12px; color: var(--muted); white-space: pre-wrap; line-height: 1.5; margin-top: 4px; }
+  .thinking summary { cursor: pointer; font-size: 12px; color: var(--blue); }
+  .quick { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-top: 1px solid var(--line); }
+  .quick button { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .quick button:hover { border-color: var(--blue); color: var(--blue); }
+  .composer { display: flex; gap: 8px; padding: 12px 14px 14px; border-top: 1px solid var(--line); }
+  .composer input { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; }
+  .composer input:focus { border-color: var(--blue); }
+  .composer button { border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; cursor: pointer; background: var(--blue); color: #fff; }
+  .draw-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .draw-grid { flex: 1; display: grid; grid-template-columns: 420px 1fr; gap: 12px; min-height: 0; }
+  .controls, .result { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; overflow-y: auto; }
+  .controls label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 6px; }
+  .controls textarea { width: 100%; min-height: 130px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 13px; font-family: inherit; line-height: 1.5; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .row label { margin: 0; white-space: nowrap; }
+  .row input, .row select { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 13px; width: 110px; }
+  .loras { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .lora-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .lora-item input { accent-color: var(--blue); }
+  .help { font-size: 12px; color: var(--muted); margin: 4px 0 0; line-height: 1.5; }
+  .translate-box { margin-top: 6px; font-size: 13px; color: var(--teal); white-space: pre-wrap; min-height: 20px; }
+  .prompt-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .mode-switch { display: flex; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; }
+  .mode-switch label { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+  .prompt-grid { flex: 1; display: grid; grid-template-columns: 420px 1fr; gap: 12px; min-height: 0; }
+  #imagePreview img { max-width: 100%; max-height: 40vh; object-fit: contain; border: 1px solid var(--line); border-radius: 8px; margin-top: 8px; background: #fafafa; }
+  #promptResult { white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
+  .auto-draw { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 10px; }
+  .records-panel { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; min-height: 0; }
+  .records-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .records-bar select, .records-bar input { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 13px; }
+  .records-table-wrap { flex: 1; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .records-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .records-table th, .records-table td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+  .records-table th { position: sticky; top: 0; background: #f8fafc; }
+  .records-pager { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; }
+  .records-pager button { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .records-pager button:disabled { opacity: 0.5; cursor: default; }
+  .draw-btn { width: 100%; margin-top: 14px; border: none; border-radius: 8px; padding: 11px; background: var(--teal); color: #fff; font-size: 14px; cursor: pointer; }
+  .result { display: flex; flex-direction: column; gap: 10px; }
+  .result img { max-width: 100%; max-height: 62vh; object-fit: contain; border-radius: 8px; border: 1px solid var(--line); background: #fafafa; }
+  .result .status { font-size: 13px; color: var(--muted); min-height: 20px; white-space: pre-wrap; }
+  .ghost { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+  .ghost:hover { border-color: var(--teal); color: var(--teal); }
+  iframe { width: 100%; height: 55vh; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  @media (max-width: 900px) {
+    .draw-grid { grid-template-columns: 1fr; }
+    .prompt-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">骑</span>骑手招聘助手 AI 工作台</div>
+    <div class="services">
+      <div class="service"><span class="dot" id="ollamaDot"></span><span>Ollama</span><button id="ollamaBtn">启动</button></div>
+      <div class="service"><span class="dot" id="comfyDot"></span><span>ComfyUI</span><button id="comfyBtn">启动</button></div>
+    </div>
+  </header>
+  <nav class="tabs">
+    <button class="tab active" data-tab="agent">招聘 Agent</button>
+    <button class="tab" data-tab="draw">AI 绘画</button>
+    <button class="tab" data-tab="prompt">提示词 Agent</button>
+    <button class="tab" data-tab="records">数据看板</button>
+  </nav>
+
+  <section id="agentTab" class="panel active">
+    <div class="chat-panel">
+      <div class="messages" id="chatMessages">
+        <div class="bubble agent">你好，我是骑手招聘助手。可以问我薪资待遇、入职要求、站点位置；也可以让我帮你查最近站点。</div>
+      </div>
+      <div class="quick" id="quickPrompts">
+        <button>介绍一下工作</button>
+        <button>薪资多少</button>
+        <button>入职有什么要求</button>
+        <button>朝阳区有哪些站点</button>
+      </div>
+      <div class="composer">
+        <input id="chatInput" placeholder="输入你的问题..." autocomplete="off">
+        <button id="chatSend">发送</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="drawTab" class="panel">
+    <div class="draw-panel">
+      <div class="draw-grid">
+        <div class="controls">
+          <label>提示词</label>
+          <textarea id="posPrompt">masterpiece, score 7, highres, absurdres, best quality, very aesthetic, anime coloring, 1girl, solo, long hair, blue eyes, school uniform, sailor collar, white shirt, pleated skirt, looking at viewer, smile, upper body, simple background, cherry blossoms</textarea>
+          <div class="translate-box" id="posTranslation"></div>
+          <label>负面提示词</label>
+          <textarea id="negPrompt">worst quality, low quality, score_1, score_2, score_3, artist name, blurry, jpeg artifacts, lowres, signature</textarea>
+          <div class="translate-box" id="negTranslation"></div>
+          <div class="row"><label>尺寸</label><select id="sizeSelect"><option value="1080x1920">竖版 1080×1920</option><option value="1920x1080">横版 1920×1080</option><option value="1024x1024">方形 1024×1024</option></select></div>
+          <p class="help">尺寸：生成图片的宽高。竖版适合人物立绘，横版适合场景，方形适合头像。</p>
+          <div class="row"><label>步数</label><input id="stepsInput" type="number" value="18" min="1" max="80"></div>
+          <p class="help">步数：采样步数。数值越大细节越多、耗时越长；搭配加速 LoRA 时建议 12-18。</p>
+          <div class="row"><label>CFG</label><input id="cfgInput" type="number" value="1" min="0.5" max="20" step="0.5"></div>
+          <p class="help">CFG：提示词遵循强度。越高越贴近提示词；加速 LoRA 通常用 1，普通出图建议 4 左右。</p>
+          <div class="loras" id="loraList"></div>
+          <button class="draw-btn" id="drawBtn">生成图片</button>
+        </div>
+        <div class="result">
+          <div class="status" id="drawStatus"></div>
+          <div id="drawResult"></div>
+          <button class="ghost" id="openComfy">打开 ComfyUI 面板</button>
+          <iframe id="comfyFrame" src="http://127.0.0.1:8188" title="ComfyUI"></iframe>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="promptTab" class="panel">
+    <div class="prompt-panel">
+      <div class="mode-switch">
+        <label><input type="radio" name="promptMode" value="image" checked> 图片反推</label>
+        <label><input type="radio" name="promptMode" value="text"> 文字生成</label>
+      </div>
+      <div class="prompt-grid">
+        <div class="controls">
+          <div id="imageMode">
+            <label>选择图片</label>
+            <input type="file" id="imageInput" accept="image/*">
+            <div id="imagePreview"></div>
+            <button class="draw-btn" id="imageToPromptBtn">识别图片</button>
+          </div>
+          <div id="textMode" style="display:none">
+            <label>描述你的画面</label>
+            <textarea id="textDesc" placeholder="例如：一个蓝发少女，穿校服，在樱花树下微笑"></textarea>
+            <button class="draw-btn" id="textToPromptBtn">生成提示词</button>
+          </div>
+        </div>
+        <div class="result">
+          <div class="status" id="promptStatus"></div>
+          <div id="promptResult"></div>
+          <label class="auto-draw"><input type="checkbox" id="autoDrawToggle"> 发送到绘画区后自动开始生成</label>
+          <button class="ghost" id="sendToDrawBtn">发送到绘画区</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="recordsTab" class="panel">
+    <div class="records-panel">
+      <div class="records-bar">
+        <select id="recordsKind">
+          <option value="agent">招聘 Agent 对话</option>
+          <option value="draw">AI 绘画</option>
+          <option value="prompt">提示词 Agent</option>
+        </select>
+        <input type="date" id="recordsFrom">
+        <span>至</span>
+        <input type="date" id="recordsTo">
+        <select id="recordsPageSize">
+          <option value="10">10 条/页</option>
+          <option value="20">20 条/页</option>
+          <option value="50">50 条/页</option>
+          <option value="100">100 条/页</option>
+        </select>
+        <button class="ghost" id="recordsExport">导出 Excel</button>
+      </div>
+      <div class="records-table-wrap">
+        <table class="records-table" id="recordsTable">
+          <thead id="recordsHead"></thead>
+          <tbody id="recordsBody"></tbody>
+        </table>
+      </div>
+      <div class="records-pager">
+        <span id="recordsInfo"></span>
+        <button id="recordsPrev">上一页</button>
+        <button id="recordsNext">下一页</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let sessionId = '';
+
+  async function refreshServices() {
+    try {
+      const res = await fetch('/api/services');
+      const data = await res.json();
+      $('ollamaDot').classList.toggle('up', data.ollama);
+      $('comfyDot').classList.toggle('up', data.comfyui);
+      $('ollamaBtn').textContent = data.ollama ? '停止' : '启动';
+      $('comfyBtn').textContent = data.comfyui ? '停止' : '启动';
+    } catch (e) { /* offline */ }
+  }
+
+  async function toggleService(name, start) {
+    await fetch('/api/services/' + (start ? 'start' : 'stop'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    refreshServices();
+  }
+
+  $('ollamaBtn').addEventListener('click', () => toggleService('ollama', !$('ollamaDot').classList.contains('up')));
+  $('comfyBtn').addEventListener('click', () => toggleService('comfyui', !$('comfyDot').classList.contains('up')));
+
+  function createChatBubble(who) {
+    const div = document.createElement('div');
+    div.className = 'bubble ' + who;
+    $('chatMessages').appendChild(div);
+    $('chatMessages').scrollTop = $('chatMessages').scrollHeight;
+    return div;
+  }
+
+  async function sendChat(message) {
+    if (!message.trim()) return;
+    createChatBubble('user').textContent = message;
+    $('chatInput').value = '';
+    const bubble = createChatBubble('agent');
+    const details = document.createElement('details');
+    details.className = 'thinking';
+    const summary = document.createElement('summary');
+    summary.textContent = '思考过程';
+    const thinkingBody = document.createElement('div');
+    details.appendChild(summary);
+    details.appendChild(thinkingBody);
+    bubble.appendChild(details);
+    const answerEl = document.createElement('div');
+    bubble.appendChild(answerEl);
+    let answer = '';
+    try {
+      const res = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, session_id: sessionId })
+      });
+      if (!res.ok || !res.body) throw new Error('stream unavailable');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split('\n\n');
+        buffer = blocks.pop();
+        for (const block of blocks) {
+          const dataLine = block.split('\n').find((l) => l.startsWith('data: '));
+          if (!dataLine) continue;
+          let data;
+          try {
+            data = JSON.parse(dataLine.slice(6));
+          } catch (e) {
+            continue;
+          }
+          if (data.kind === 'thinking') {
+            thinkingBody.textContent += data.delta;
+            details.open = true;
+          } else if (data.kind === 'answer') {
+            answer += data.delta;
+            answerEl.textContent = answer;
+          } else if (data.kind === 'done') {
+            sessionId = data.session_id || sessionId;
+            const tag = document.createElement('span');
+            tag.className = 'tag';
+            tag.textContent = data.source === 'llm' ? '大模型回答' : '知识库检索回答';
+            bubble.appendChild(tag);
+          } else if (data.kind === 'error') {
+            answerEl.textContent = data.error || '出错了';
+          }
+        }
+      }
+    } catch (e) {
+      answerEl.textContent = '请求失败：' + e.message;
+    }
+  }
+
+  $('chatSend').addEventListener('click', () => sendChat($('chatInput').value));
+  $('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat($('chatInput').value); });
+  $('quickPrompts').addEventListener('click', (e) => {
+    if (e.target.tagName === 'BUTTON') sendChat(e.target.textContent);
+  });
+
+  const translateCache = new Map();
+  const tagDict = {
+    '1girl': '单少女', 'solo': '单人', 'long hair': '长发', 'short hair': '短发', 'blue eyes': '蓝眼睛',
+    'red eyes': '红眼睛', 'school uniform': '校服', 'sailor collar': '水手领', 'white shirt': '白衬衫',
+    'pleated skirt': '百褶裙', 'looking at viewer': '看向观众', 'smile': '微笑', 'upper body': '上半身',
+    'simple background': '简单背景', 'cherry blossoms': '樱花', 'masterpiece': '杰作', 'best quality': '最佳质量',
+    'very aesthetic': '很有美感', 'anime coloring': '动漫上色', 'highres': '高分辨率', 'absurdres': '超高分辨率',
+    'score 7': '高分7', 'score 8': '高分8', 'detail eyes': '精致眼睛', 'multicolored eyes': '异色瞳',
+    'white background': '白色背景', 'grey background': '灰色背景', 'blush': '脸红', 'parted lips': '微张嘴唇',
+    'hair between eyes': '发丝遮眼', 'collarbone': '锁骨', 'cowboy shot': '半身镜头', 'portrait': '肖像'
+  };
+  let translateTimer = null;
+  let translateSeq = 0;
+
+  function basicTranslate(text) {
+    return text.split(',').map((part) => {
+      const key = part.trim();
+      return tagDict[key] || key;
+    }).filter(Boolean).join('，');
+  }
+
+  async function requestTranslation(text) {
+    const seq = ++translateSeq;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (seq !== translateSeq) return;
+        if (data.translation && data.translation.trim()) {
+          translateCache.set(text, data.translation.trim());
+          $('posTranslation').textContent = '中文：' + data.translation.trim();
+          return;
+        }
+      } catch (e) {
+        if (seq !== translateSeq) return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+    if (seq === translateSeq) {
+      $('posTranslation').textContent = '基础翻译：' + basicTranslate(text);
+    }
+  }
+
+  $('posPrompt').addEventListener('input', () => {
+    clearTimeout(translateTimer);
+    const text = $('posPrompt').value.trim();
+    if (!text) {
+      $('posTranslation').textContent = '';
+      return;
+    }
+    if (translateCache.has(text)) {
+      $('posTranslation').textContent = '中文：' + translateCache.get(text);
+      return;
+    }
+    $('posTranslation').textContent = '正在翻译...';
+    translateTimer = setTimeout(() => requestTranslation(text), 900);
+  });
+
+  async function loadLoras() {
+    try {
+      const res = await fetch('/api/loras');
+      const data = await res.json();
+      const list = data.loras || [];
+      $('loraList').innerHTML = '';
+      if (!list.length) {
+        $('loraList').innerHTML = '<div class="lora-item">未检测到 LoRA 文件</div>';
+        return;
+      }
+      list.forEach((item) => {
+        const label = document.createElement('label');
+        label.className = 'lora-item';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.value = item.name;
+        if (item.name.includes('anima-turbo')) box.checked = true;
+        const span = document.createElement('span');
+        span.textContent = item.name + ' (' + item.size_mb + 'MB)';
+        label.appendChild(box);
+        label.appendChild(span);
+        $('loraList').appendChild(label);
+      });
+    } catch (e) { /* ignore */ }
+  }
+
+  async function draw() {
+    const size = $('sizeSelect').value.split('x');
+    const loras = Array.from(document.querySelectorAll('#loraList input:checked')).map((i) => i.value);
+    $('drawStatus').textContent = '正在生成，请稍候...';
+    $('drawResult').innerHTML = '';
+    try {
+      const res = await fetch('/api/draw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: $('posPrompt').value,
+          negative_prompt: $('negPrompt').value,
+          width: Number(size[0]),
+          height: Number(size[1]),
+          steps: Number($('stepsInput').value),
+          cfg: Number($('cfgInput').value),
+          loras
+        })
+      });
+      const data = await res.json();
+      if (data.image_url) {
+        const img = document.createElement('img');
+        img.src = data.image_url;
+        $('drawResult').appendChild(img);
+        $('drawStatus').textContent = '生成完成，用时 ' + data.elapsed + ' 秒' + (data.saved_path ? '，已保存到 ' + data.saved_path : '');
+      } else {
+        $('drawStatus').textContent = data.error || '生成失败';
+      }
+    } catch (e) {
+      $('drawStatus').textContent = '请求失败：' + e.message;
+    }
+  }
+
+  $('drawBtn').addEventListener('click', draw);
+  $('openComfy').addEventListener('click', () => window.open('http://127.0.0.1:8188', '_blank'));
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === name + 'Tab'));
+  }
+
+  document.querySelectorAll('.tab').forEach((tab) => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+  });
+
+  let lastPromptResult = null;
+  let lastImageData = null;
+
+  document.querySelectorAll('input[name="promptMode"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      const mode = document.querySelector('input[name="promptMode"]:checked').value;
+      $('imageMode').style.display = mode === 'image' ? '' : 'none';
+      $('textMode').style.display = mode === 'text' ? '' : 'none';
+    });
+  });
+
+  $('imageInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      lastImageData = reader.result;
+      $('imagePreview').innerHTML = '<img src="' + reader.result + '">';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  $('imageToPromptBtn').addEventListener('click', async () => {
+    if (!lastImageData) {
+      $('promptStatus').textContent = '请先选择图片';
+      return;
+    }
+    $('promptStatus').textContent = '正在识别图片...';
+    $('promptResult').textContent = '';
+    try {
+      const file = $('imageInput').files[0];
+      const res = await fetch('/api/prompt/from-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: lastImageData, filename: file ? file.name : 'image.png' })
+      });
+      const data = await res.json();
+      if (data.prompt) {
+        lastPromptResult = data;
+        $('promptResult').textContent = '原始描述：\n' + data.description + '\n\n英文提示词：\n' + data.prompt;
+        $('promptStatus').textContent = '识别完成';
+      } else {
+        $('promptStatus').textContent = data.error || '识别失败';
+      }
+    } catch (e) {
+      $('promptStatus').textContent = '请求失败：' + e.message;
+    }
+  });
+
+  $('textToPromptBtn').addEventListener('click', async () => {
+    const text = $('textDesc').value.trim();
+    if (!text) {
+      $('promptStatus').textContent = '请先输入描述';
+      return;
+    }
+    $('promptStatus').textContent = '正在生成提示词...';
+    $('promptResult').textContent = '';
+    try {
+      const res = await fetch('/api/prompt/from-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+      if (data.prompt) {
+        lastPromptResult = data;
+        $('promptResult').textContent = '原始描述：\n' + data.source_text + '\n\n英文提示词：\n' + data.prompt;
+        $('promptStatus').textContent = '生成完成';
+      } else {
+        $('promptStatus').textContent = data.error || '生成失败';
+      }
+    } catch (e) {
+      $('promptStatus').textContent = '请求失败：' + e.message;
+    }
+  });
+
+  $('sendToDrawBtn').addEventListener('click', () => {
+    if (!lastPromptResult || !lastPromptResult.prompt) {
+      $('promptStatus').textContent = '请先生成提示词';
+      return;
+    }
+    $('posPrompt').value = lastPromptResult.prompt;
+    const text = $('posPrompt').value.trim();
+    if (text) {
+      $('posTranslation').textContent = '正在翻译...';
+      requestTranslation(text);
+    }
+    switchTab('draw');
+    if ($('autoDrawToggle').checked) {
+      setTimeout(draw, 800);
+    }
+  });
+
+  let negTranslateTimer = null;
+  let negTranslateSeq = 0;
+  $('negPrompt').addEventListener('input', () => {
+    clearTimeout(negTranslateTimer);
+    const text = $('negPrompt').value.trim();
+    if (!text) {
+      $('negTranslation').textContent = '';
+      return;
+    }
+    $('negTranslation').textContent = '正在翻译...';
+    negTranslateTimer = setTimeout(async () => {
+      const seq = ++negTranslateSeq;
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (seq !== negTranslateSeq) return;
+        $('negTranslation').textContent = data.translation ? '中文：' + data.translation : '基础翻译：' + basicTranslate(text);
+      } catch (e) {
+        if (seq === negTranslateSeq) $('negTranslation').textContent = '基础翻译：' + basicTranslate(text);
+      }
+    }, 900);
+  });
+
+  const recordsState = { kind: 'agent', page: 1, pageSize: 10, from: '', to: '' };
+  const recordCols = {
+    agent: ['created_at', 'sender', 'content', 'retrieval_score', 'source'],
+    draw: ['started_at', 'finished_at', 'duration_seconds', 'prompt', 'prompt_translation', 'negative_prompt', 'negative_translation', 'width', 'height', 'steps', 'cfg', 'lora_anima_turbo', 'lora_high_contrast', 'image_path', 'seed', 'status', 'error'],
+    prompt: ['started_at', 'finished_at', 'duration_seconds', 'mode', 'user_input', 'image_path', 'description', 'prompt_result', 'model', 'status']
+  };
+
+  async function loadRecords() {
+    const q = new URLSearchParams({
+      kind: recordsState.kind,
+      page: String(recordsState.page),
+      page_size: String(recordsState.pageSize)
+    });
+    if (recordsState.from) q.set('date_from', recordsState.from);
+    if (recordsState.to) q.set('date_to', recordsState.to);
+    try {
+      const res = await fetch('/api/records?' + q.toString());
+      const data = await res.json();
+      renderRecords(data);
+    } catch (e) {
+      $('recordsInfo').textContent = '加载失败：' + e.message;
+    }
+  }
+
+  function renderRecords(data) {
+    const cols = recordCols[recordsState.kind];
+    $('recordsHead').innerHTML = '<tr>' + cols.map((c) => '<th>' + c + '</th>').join('') + '</tr>';
+    const rows = data.items || [];
+    $('recordsBody').innerHTML = rows.map((row) => {
+      return '<tr>' + cols.map((c) => '<td title="' + String(row[c] ?? '').replace(/"/g, '&quot;') + '">' + String(row[c] ?? '') + '</td>').join('') + '</tr>';
+    }).join('');
+    $('recordsInfo').textContent = '共 ' + data.total + ' 条，第 ' + data.page + ' 页';
+    $('recordsPrev').disabled = data.page <= 1;
+    $('recordsNext').disabled = data.page * data.page_size >= data.total;
+  }
+
+  $('recordsKind').addEventListener('change', (e) => {
+    recordsState.kind = e.target.value;
+    recordsState.page = 1;
+    loadRecords();
+  });
+  $('recordsFrom').addEventListener('change', (e) => {
+    recordsState.from = e.target.value;
+    recordsState.page = 1;
+    loadRecords();
+  });
+  $('recordsTo').addEventListener('change', (e) => {
+    recordsState.to = e.target.value;
+    recordsState.page = 1;
+    loadRecords();
+  });
+  $('recordsPageSize').addEventListener('change', (e) => {
+    recordsState.pageSize = Number(e.target.value);
+    recordsState.page = 1;
+    loadRecords();
+  });
+  $('recordsPrev').addEventListener('click', () => {
+    if (recordsState.page > 1) { recordsState.page -= 1; loadRecords(); }
+  });
+  $('recordsNext').addEventListener('click', () => {
+    recordsState.page += 1;
+    loadRecords();
+  });
+  $('recordsExport').addEventListener('click', () => {
+    const q = new URLSearchParams();
+    if (recordsState.from) q.set('date_from', recordsState.from);
+    if (recordsState.to) q.set('date_to', recordsState.to);
+    window.open('/api/export/' + recordsState.kind + '?' + q.toString(), '_blank');
+  });
+
+  refreshServices();
+  setInterval(refreshServices, 5000);
+  loadLoras();
+</script>
+</body>
+</html>

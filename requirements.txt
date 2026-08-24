@@ -1,0 +1,2 @@
+requests==2.34.2
+# 复用 D:\workSpace\code\.venv 中的 openpyxl/pandas/fastembed/jieba 等依赖。
