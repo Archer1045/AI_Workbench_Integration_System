@@ -19,3 +19,8 @@ frontend/_dev_server*.log
 # OS/editor temporary files
 .DS_Store
 Thumbs.db
+
+# Separate private Git LFS asset repository mounted at the Vite public path.
+frontend/public/
+frontend/workshop-actual.png
+$null
