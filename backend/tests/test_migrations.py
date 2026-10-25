@@ -1,6 +1,8 @@
 """SQLite 迁移机制测试：幂等执行且版本号递增。"""
 from __future__ import annotations
 
+import json
+
 import database
 
 
@@ -131,6 +133,9 @@ def test_migrations_idempotent(tmp_path, monkeypatch):
     )
     assert virtuosa is not None
     assert virtuosa["appearance_tags"][0] == "virtuosa_(arknights)"
+    assert "black eyes" in virtuosa["appearance_tags"]
+    assert "amber pupils" in virtuosa["appearance_tags"]
+    assert "amber eyes" not in virtuosa["appearance_tags"]
     dania = database.get_character_appearance_preset(
         "builtin_character_wuthering_waves_dania"
     )
@@ -162,13 +167,20 @@ def test_migrations_idempotent(tmp_path, monkeypatch):
     )
     assert lady_avalon_a2 is not None
     assert "二破（A2）" in lady_avalon_a2["name"]
-    for preset_id in (
-        "builtin_character_fgo_701300_berserker_a3",
-        "builtin_character_fgo_302500_lancer_a3",
-    ):
-        kiyohime_a3 = database.get_character_appearance_preset(preset_id)
-        assert kiyohime_a3 is not None
-        assert "三破（A3）" in kiyohime_a3["name"]
+    kiyohime_expected = {
+        "builtin_character_fgo_701300_berserker_a3": ("red eyes", "三破（A3）"),
+        "builtin_character_fgo_701300_berserker_a4": ("yellow eyes", "满破（A4）"),
+        "builtin_character_fgo_302500_lancer_a3": ("red eyes", "三破（A3）"),
+        "builtin_character_fgo_302500_lancer_a4": ("red eyes", "满破（A4）"),
+    }
+    for preset_id, (eye_color, form_label) in kiyohime_expected.items():
+        kiyohime = database.get_character_appearance_preset(preset_id)
+        assert kiyohime is not None
+        assert form_label in kiyohime["name"]
+        assert eye_color in kiyohime["appearance_tags"]
+        assert "black dragon horns" in kiyohime["appearance_tags"]
+        if preset_id != "builtin_character_fgo_701300_berserker_a4":
+            assert "yellow eyes" not in kiyohime["appearance_tags"]
     assert (
         database.get_character_appearance_preset(
             "builtin_character_fgo_2800300_pretender_a4"
@@ -276,3 +288,61 @@ def test_character_outfit_migration_upgrades_legacy_table(tmp_path, monkeypatch)
     assert columbina is not None
     assert columbina["outfit_id"] == "outfit_genshin_columbina_default"
     assert "black and white dress" not in columbina["appearance_tags"]
+
+
+def test_character_visual_correction_migration_upgrades_stale_rows(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(database, "DB_PATH", tmp_path / "visual_corrections.db")
+    with database.get_connection() as conn:
+        conn.executescript(database._SCHEMA)
+        stale = {
+            "builtin_character_fgo_302500_lancer_a4": [
+                "kiyohime_(lancer)_(fate)",
+                "long white hair",
+                "yellow eyes",
+            ],
+            "builtin_character_arknights_virtuosa": [
+                "virtuosa_(arknights)",
+                "very long black hair",
+                "amber eyes",
+            ],
+        }
+        for preset_id, tags in stale.items():
+            conn.execute(
+                """
+                INSERT INTO character_appearance_presets (
+                    preset_id, name, work, category, appearance_tags,
+                    clothing_tags, expression_tags, outfit_id, note, source,
+                    version, enabled, created_at, updated_at
+                ) VALUES (?, ?, '', '角色', ?, '[]', '[]', '', 'stale',
+                          'builtin', 1, 1, '', '')
+                """,
+                (preset_id, preset_id, json.dumps(tags)),
+            )
+
+        database._migration_031_character_visual_corrections(conn)
+        lancer = conn.execute(
+            """
+            SELECT appearance_tags FROM character_appearance_presets
+            WHERE preset_id = 'builtin_character_fgo_302500_lancer_a4'
+            ORDER BY version DESC LIMIT 1
+            """
+        ).fetchone()
+        virtuosa = conn.execute(
+            """
+            SELECT appearance_tags FROM character_appearance_presets
+            WHERE preset_id = 'builtin_character_arknights_virtuosa'
+            ORDER BY version DESC LIMIT 1
+            """
+        ).fetchone()
+
+    lancer_tags = json.loads(lancer["appearance_tags"])
+    virtuosa_tags = json.loads(virtuosa["appearance_tags"])
+    assert "red eyes" in lancer_tags
+    assert "yellow eyes" not in lancer_tags
+    assert "black dragon horns" in lancer_tags
+    assert "black eyes" in virtuosa_tags
+    assert "amber pupils" in virtuosa_tags
+    assert "amber eyes" not in virtuosa_tags

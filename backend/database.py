@@ -266,7 +266,7 @@ _TABLES = {
 }
 
 # SQLite 版本化迁移：新库与旧库都从 user_version=0 开始依次执行。
-SCHEMA_VERSION = 30
+SCHEMA_VERSION = 31
 
 
 def get_connection() -> sqlite3.Connection:
@@ -1063,6 +1063,11 @@ def _migration_030_builtin_character_outfit_resync(conn: sqlite3.Connection) -> 
     _migration_029_character_outfit_links(conn)
 
 
+def _migration_031_character_visual_corrections(conn: sqlite3.Connection) -> None:
+    """Correct Kiyohime horns/eye colors and Virtuosa's eye description."""
+    _migration_029_character_outfit_links(conn)
+
+
 _MIGRATIONS = (
     _migration_001_compat,
     _migration_002_background_jobs,
@@ -1094,6 +1099,7 @@ _MIGRATIONS = (
     _migration_028_columbina_hair_color,
     _migration_029_character_outfit_links,
     _migration_030_builtin_character_outfit_resync,
+    _migration_031_character_visual_corrections,
 )
 
 
