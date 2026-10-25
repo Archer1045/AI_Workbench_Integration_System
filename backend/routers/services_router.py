@@ -14,6 +14,12 @@ def service_status() -> dict:
     return services.status()
 
 
+@router.get("/api/system/gpu")
+def gpu_status() -> dict:
+    """返回 GPU 实时状态与当前驻留的 Ollama 模型。"""
+    return services.gpu_status()
+
+
 @router.post("/api/services/start")
 def service_start(payload: dict = Body(...)):
     """启动指定服务。"""

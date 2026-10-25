@@ -1,5 +1,6 @@
 // 招聘 Agent 对话状态与流式请求
 import useStore from 'resso';
+import { api } from '../api';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -8,9 +9,17 @@ export interface ChatMessage {
   source?: string;
 }
 
+export interface AgentSession {
+  session_id: string;
+  last_at: string;
+  message_count: number;
+  last_message?: string;
+}
+
 interface ChatState {
   messages: ChatMessage[];
   sessionId: string;
+  sessions: AgentSession[];
   sending: boolean;
   [key: string]: unknown;
 }
@@ -18,6 +27,7 @@ interface ChatState {
 export const chatStore = useStore<ChatState>({
   messages: [],
   sessionId: '',
+  sessions: [],
   sending: false,
 });
 
@@ -72,6 +82,7 @@ export async function sendChat(text: string): Promise<void> {
         } else if (data.kind === 'done') {
           chatStore.sessionId = String(data.session_id || chatStore.sessionId);
           updateLastMessage((msg) => ({ ...msg, source: String(data.source || '') }));
+          void loadChatSessions();
         } else if (data.kind === 'error') {
           content = String(data.error || '出错了');
           updateLastMessage((msg) => ({ ...msg, content }));
@@ -82,5 +93,39 @@ export async function sendChat(text: string): Promise<void> {
     updateLastMessage((msg) => ({ ...msg, content: `请求失败：${(e as Error).message}` }));
   } finally {
     chatStore.sending = false;
+  }
+}
+
+export async function loadChatSessions(): Promise<void> {
+  try {
+    const { data } = await api.get<{ items: AgentSession[] }>('/chat/sessions');
+    chatStore.sessions = data.items || [];
+  } catch {
+    // 列表加载失败不影响当前对话
+  }
+}
+
+export async function switchChatSession(sessionId: string): Promise<void> {
+  chatStore.sessionId = sessionId;
+  try {
+    const { data } = await api.get<{ items: Record<string, unknown>[] }>('/chat/messages', {
+      params: { session_id: sessionId },
+    });
+    chatStore.messages = (data.items || []).map((item) => ({
+      role: item.sender === 'user' ? ('user' as const) : ('assistant' as const),
+      content: String(item.content || ''),
+      source: item.source ? String(item.source) : undefined,
+    }));
+  } catch {
+    chatStore.messages = [];
+  }
+}
+
+export async function deleteChatSession(sessionId: string): Promise<void> {
+  await api.delete(`/chat/sessions/${sessionId}`);
+  chatStore.sessions = chatStore.sessions.filter((item) => item.session_id !== sessionId);
+  if (chatStore.sessionId === sessionId) {
+    chatStore.sessionId = '';
+    chatStore.messages = [];
   }
 }

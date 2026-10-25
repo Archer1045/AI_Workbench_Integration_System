@@ -1,8 +1,10 @@
 // 数据看板状态：类型、日期筛选、分页、导出
 import useStore from 'resso';
 import { api, type RecordsResult } from '../api';
+import { getRuntimeConfig } from './runtimeConfig';
 
-export type RecordsKind = 'agent' | 'draw' | 'prompt';
+export type RecordsKind = 'agent' | 'draw' | 'prompt' | 'video';
+const queryConfig = getRuntimeConfig().query;
 
 interface RecordsState {
   kind: RecordsKind;
@@ -17,8 +19,8 @@ interface RecordsState {
 
 export const recordsStore = useStore<RecordsState>({
   kind: 'agent',
-  page: 1,
-  pageSize: 10,
+  page: queryConfig.records_page_default,
+  pageSize: queryConfig.records_page_size_default,
   dateFrom: '',
   dateTo: '',
   data: null,

@@ -1,0 +1,95 @@
+{
+  "plan_id": "mock-90pp-3t-plan",
+  "quest_id": "free_ikeda_1_90pp_mock",
+  "title": "90++ Mock 三回合验证方案",
+  "confidence": 0.5,
+  "assumptions": [
+    "仅用于验证模拟器、动作顺序和门槛结构。",
+    "数值为人工 Mock，不代表正式游戏伤害结果。"
+  ],
+  "warnings": [
+    "正式 90++ 开放后需要用真实敌人数据和账号礼装重新计算。"
+  ],
+  "source_ids": [
+    "S3"
+  ],
+  "combatants": [
+    {
+      "actor_slot": 1,
+      "servant_record_id": "mock-assassin",
+      "name": "Mock Assassin",
+      "class_name": "Assassin",
+      "attack": 50000,
+      "hp": 15000,
+      "class_attack_modifier": 1,
+      "class_relation": "advantage",
+      "np_multiplier": 20,
+      "current_np": 100,
+      "np_capacity": 100
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "t1_np",
+      "order": 1,
+      "turn": 1,
+      "actor_slot": 1,
+      "action_type": "np",
+      "target_enemy_ids": [
+        "w1_bomb"
+      ],
+      "damage_multiplier": 20,
+      "np_change": -100
+    },
+    {
+      "action_id": "t2_np",
+      "order": 1,
+      "turn": 2,
+      "actor_slot": 1,
+      "action_type": "np",
+      "target_enemy_ids": [
+        "w2_spriggan"
+      ],
+      "damage_multiplier": 25,
+      "np_change": -100
+    },
+    {
+      "action_id": "t2_follow",
+      "order": 2,
+      "turn": 2,
+      "actor_slot": 1,
+      "action_type": "attack",
+      "target_enemy_ids": [
+        "w2_pyro"
+      ],
+      "card_type": "buster",
+      "damage_multiplier": 50,
+      "np_change": 20
+    },
+    {
+      "action_id": "t3_np",
+      "order": 1,
+      "turn": 3,
+      "actor_slot": 1,
+      "action_type": "np",
+      "target_enemy_ids": [
+        "w3_technica"
+      ],
+      "damage_multiplier": 50,
+      "np_change": -100
+    },
+    {
+      "action_id": "t3_follow",
+      "order": 2,
+      "turn": 3,
+      "actor_slot": 1,
+      "action_type": "attack",
+      "target_enemy_ids": [
+        "w3_bomb"
+      ],
+      "card_type": "buster",
+      "damage_multiplier": 50,
+      "np_change": 20
+    }
+  ]
+}

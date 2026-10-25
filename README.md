@@ -1,4 +1,4 @@
-# 骑手招聘助手 AI 工作台（前后端分离版）
+# AI工作台（前后端分离版）
 
 统一入口，一个项目同时提供“招聘 Agent、AI 绘画、提示词 Agent、数据看板”四个工作区。
 
@@ -28,8 +28,7 @@ studio/
 │       ├── components/      # 四个工作区组件
 │       ├── api.ts           # axios 客户端
 │       └── App.tsx          # 主布局
-├── static/                  # 旧版单文件界面（保留备用）
-└── main.py                  # 旧版入口（保留备用）
+└── static/                  # 旧版静态页面（保留备用）
 ```
 
 ## 启动方式
@@ -37,7 +36,7 @@ studio/
 ### 推荐：只启动前端（会自动拉起后端）
 
 ```powershell
-cd D:\workSpace\code\骑手招聘助手\studio\frontend
+cd D:\workSpace\code\ai-workbench\studio\frontend
 npm run dev
 ```
 
@@ -54,7 +53,7 @@ D:\workSpace\code\.venv\Scripts\python.exe run.py
 ### 单独启动后端
 
 ```powershell
-cd D:\workSpace\code\骑手招聘助手\studio\backend
+cd D:\workSpace\code\ai-workbench\studio\backend
 D:\workSpace\code\.venv\Scripts\python.exe run.py
 ```
 
@@ -90,7 +89,9 @@ D:\workSpace\code\.venv\Scripts\python.exe run.py
 
 - 底模：
   - `chosenMixAnima_v10.safetensors`：旧模型，约 3.9GB
-  - `chosenIrisesMix_v20Anima.safetensors`：新模型，约 3.9GB
+  - `chosenIrisesMix_v20Anima.safetensors`：原版，`model.diffusion_model.` 前缀，出图可用、训练不可用，约 3.9GB
+  - `chosenIrisesMix_v20Anima_net.safetensors`：转换版，`net.` 前缀，出图与训练均可用，约 3.9GB
+  - `miaomiaoHarem_anima16.safetensors`：`net.` 前缀，出图与训练均可用，约 3.9GB
 - 文本编码器：
   - `qwen_3_06b_base.safetensors`：Anima 文本编码器，约 1.1GB
   - `clip_l.safetensors`：Flux 备用，约 235MB
@@ -107,11 +108,11 @@ D:\workSpace\code\.venv\Scripts\python.exe run.py
 1. 招聘 Agent：`qwen3:8b` 大模型 + 向量知识库，SSE 流式显示思考过程和回答；Ollama 未启动时自动回退纯检索。
 2. AI 绘画：Anima 文生图，支持新旧底模选择、多组提示词批量生成（每组最多 10 张、单次最多 20 张），提示词/负面提示词实时中文翻译，LoRA 勾选，图片自动保存。
 3. 提示词 Agent：图片反推（`qwen2.5vl:3b`）和自然语言转英文提示词，可发送到绘画区并选择自动生成。
-4. 数据看板：按日筛选、分页（10/20/50/100）、导出 Excel。
+4. 数据看板：按日筛选、分页（10/20/50/100）、导出 Excel，以及 AI 绘画提示词使用频次统计（表格含中文翻译，柱形图 hover 显示中文翻译，Top N 可自由输入）。
 
 ## 数据库
 
-- 位置：`D:\workSpace\code\骑手招聘助手\AIproduct\rider_studio.db`
+- 位置：`D:\workSpace\code\ai-workbench\AIproduct\rider_studio.db`
 - 表结构：
   - `agent_chat_records`：对话时间、发送人、内容、检索匹配度、来源
   - `draw_records`：批次ID、组号、底模、提示词、翻译、负面提示词、尺寸、步数、CFG、LoRA、耗时、图片路径、状态
@@ -130,6 +131,7 @@ D:\workSpace\code\.venv\Scripts\python.exe run.py
 - `GET /api/images/{filename}`
 - `POST /api/prompt/from-text`、`POST /api/prompt/from-image`
 - `GET /api/records`、`GET /api/export/{kind}`
+- `GET /api/records/prompt-stats`：AI 绘画提示词频次统计
 
 ## 手动重启
 
@@ -139,7 +141,7 @@ D:\workSpace\code\.venv\Scripts\python.exe run.py
 Stop-Process -Id <后端 PID> -Force
 
 # 重新启动
-cd D:\workSpace\code\骑手招聘助手\studio\frontend
+cd D:\workSpace\code\ai-workbench\studio\frontend
 npm run dev
 ```
 

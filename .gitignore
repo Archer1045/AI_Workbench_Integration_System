@@ -5,6 +5,17 @@ frontend/node_modules/
 frontend/dist/
 frontend/vite.config.js
 frontend/vite.config.d.ts
+frontend/vitest.config.js
+frontend/vitest.config.d.ts
 frontend/*.tsbuildinfo
 test_output.png
 .env
+
+# Local process logs and transient runtime output
+*.log
+backend/_backend_*.log
+frontend/_dev_server*.log
+
+# OS/editor temporary files
+.DS_Store
+Thumbs.db

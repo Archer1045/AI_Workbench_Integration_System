@@ -2,17 +2,19 @@
 import useStore from 'resso';
 import { api, type ServiceStatus } from '../api';
 
+type ServiceName = 'ollama' | 'comfyui';
+
 interface ServicesState {
   ollama: boolean;
   comfyui: boolean;
-  loading: boolean;
+  loading: Record<ServiceName, boolean>;
   [key: string]: unknown;
 }
 
 export const servicesStore = useStore<ServicesState>({
   ollama: false,
   comfyui: false,
-  loading: false,
+  loading: { ollama: false, comfyui: false },
 });
 
 // 刷新服务状态
@@ -27,12 +29,12 @@ export async function refreshServices(): Promise<void> {
 }
 
 // 启动或停止指定服务
-export async function toggleService(name: 'ollama' | 'comfyui', start: boolean): Promise<void> {
-  servicesStore.loading = true;
+export async function toggleService(name: ServiceName, start: boolean): Promise<void> {
+  servicesStore.loading = { ...servicesStore.loading, [name]: true };
   try {
     await api.post(`/services/${start ? 'start' : 'stop'}`, { name });
   } finally {
-    servicesStore.loading = false;
+    servicesStore.loading = { ...servicesStore.loading, [name]: false };
     await refreshServices();
   }
 }

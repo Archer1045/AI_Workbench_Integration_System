@@ -1,0 +1,652 @@
+{
+  "event_id": "official-18491",
+  "revision": 1,
+  "server": "CN",
+  "title": "终结·万圣节2026~于南瓜星闪耀的歌姬~",
+  "subtitle": "寻找下落不明的伊丽莎白·巴托里，在谜之伊丽亲的引导下前往苍辉银河。",
+  "starts_at": "2026-10-22T19:00:00+08:00",
+  "ends_at": "2026-11-12T13:59:00+08:00",
+  "exchange_ends_at": "2026-11-19T13:59:00+08:00",
+  "participation_requirement": "通关「特异点F 燃烧污染都市 冬木」",
+  "location": "完结南瓜行星 万圣节星球",
+  "tags": [
+    "万圣节",
+    "歌姬点数",
+    "逐日开放",
+    "活动赠送从者",
+    "活动商店"
+  ],
+  "mechanics": [
+    {
+      "title": "歌姬点数",
+      "detail": "活动关卡掉落歌姬点数；总获得量达到档位后可在「活动报酬」中领取素材与传承结晶等奖励，也是主线推进门槛之一。",
+      "kind": "fact",
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "title": "主线逐日开放",
+      "detail": "主线与对应自由本从 10 月 22 日 19:00 起逐日开放，推进需要通关前置主线并达到 25000、60000、100000、160000、310000 等歌姬点数门槛。",
+      "kind": "fact",
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "title": "活动加成从者",
+      "detail": "伊丽莎白·巴托里与终结的伊丽莎白为攻击威力 +100% / 牵绊 +50%；其余活动对象从者按公告分别为 +50% / +20% 或 +30% / +20%。",
+      "kind": "fact",
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "title": "活动赠送从者",
+      "detail": "推进至主线第十节后，★4（SR）终结的伊丽莎白正式加入；灵基再临素材「终焉的头箍」通过活动商店兑换。",
+      "kind": "fact",
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "title": "追加与挑战关卡",
+      "detail": "追加关卡于 10 月 27 日 17:00 开放；挑战关卡于 10 月 28 日 17:00 开放，需要通关活动第十节与终局特异点。",
+      "kind": "fact",
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    }
+  ],
+  "bonus_servants": [
+    {
+      "name": "伊丽莎白·巴托里",
+      "class_name": "Lancer",
+      "rarity": 5,
+      "attack_bonus_percent": 100,
+      "bond_bonus_percent": 50,
+      "source_ids": ["official-18491"]
+    },
+    {
+      "name": "终结的伊丽莎白",
+      "class_name": "Avenger",
+      "rarity": 4,
+      "attack_bonus_percent": 100,
+      "bond_bonus_percent": 50,
+      "source_ids": ["official-18491"]
+    },
+    {
+      "name": "伊丽莎白·巴托里〔勇者〕",
+      "class_name": "Saber",
+      "rarity": 4,
+      "attack_bonus_percent": 50,
+      "bond_bonus_percent": 20,
+      "source_ids": ["official-18491"]
+    },
+    {
+      "name": "伊丽莎白·巴托里〔灰姑娘〕",
+      "class_name": "Rider",
+      "rarity": 4,
+      "attack_bonus_percent": 50,
+      "bond_bonus_percent": 20,
+      "source_ids": ["official-18491"]
+    },
+    {
+      "name": "伊丽莎白·巴托里〔万圣节〕",
+      "class_name": "Caster",
+      "rarity": 4,
+      "attack_bonus_percent": 50,
+      "bond_bonus_percent": 20,
+      "source_ids": ["official-18491"]
+    },
+    {
+      "name": "卡米拉",
+      "class_name": "Assassin",
+      "rarity": 4,
+      "attack_bonus_percent": 50,
+      "bond_bonus_percent": 20,
+      "source_ids": ["official-18491"]
+    },
+    {
+      "name": "阿喀琉斯",
+      "class_name": "Rider",
+      "rarity": 5,
+      "attack_bonus_percent": 50,
+      "bond_bonus_percent": 20,
+      "source_ids": ["official-18491"]
+    },
+    {
+      "name": "雅克·德·莫莱",
+      "class_name": "Foreigner",
+      "rarity": 5,
+      "attack_bonus_percent": 50,
+      "bond_bonus_percent": 20,
+      "source_ids": ["official-18491"]
+    },
+    {
+      "name": "刑部姬",
+      "class_name": "Assassin",
+      "rarity": 5,
+      "attack_bonus_percent": 30,
+      "bond_bonus_percent": 20,
+      "source_ids": ["official-18491"]
+    },
+    {
+      "name": "克娄巴特拉",
+      "class_name": "Assassin",
+      "rarity": 5,
+      "attack_bonus_percent": 30,
+      "bond_bonus_percent": 20,
+      "source_ids": ["official-18491"]
+    }
+  ],
+  "phases": [
+    {
+      "phase_id": "halloween_2026_phase_1",
+      "name": "序幕～第二节 / 首批自由本",
+      "phase_type": "main",
+      "opens_at": "2026-10-22T19:00:00+08:00",
+      "unlock_condition": "通关特异点F 燃烧污染都市 冬木",
+      "summary": "推进序幕至第二节，并开放首批歌姬点数自由本。",
+      "quest_ids": [
+        "halloween_2026_main_0",
+        "halloween_2026_main_1",
+        "halloween_2026_main_2",
+        "halloween_2026_free_1",
+        "halloween_2026_free_2",
+        "halloween_2026_free_3"
+      ],
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "phase_id": "halloween_2026_phase_2",
+      "name": "第三节～第四节",
+      "phase_type": "main",
+      "opens_at": "2026-10-23T17:00:00+08:00",
+      "unlock_condition": "通关第二节并累计 25000 歌姬点数",
+      "summary": "开放第三节至第四节及对应自由本。",
+      "quest_ids": ["halloween_2026_main_3", "halloween_2026_main_4"],
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "phase_id": "halloween_2026_phase_3",
+      "name": "第五节～第六节",
+      "phase_type": "main",
+      "opens_at": "2026-10-24T17:00:00+08:00",
+      "unlock_condition": "通关第四节并累计 60000 歌姬点数",
+      "summary": "开放第五节至第六节及对应自由本。",
+      "quest_ids": ["halloween_2026_main_5", "halloween_2026_main_6"],
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "phase_id": "halloween_2026_phase_4",
+      "name": "第七节～第八节",
+      "phase_type": "main",
+      "opens_at": "2026-10-25T17:00:00+08:00",
+      "unlock_condition": "通关第六节并累计 100000 歌姬点数",
+      "summary": "开放第七节至第八节及对应自由本。",
+      "quest_ids": ["halloween_2026_main_7", "halloween_2026_main_8"],
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "phase_id": "halloween_2026_phase_5",
+      "name": "第九节",
+      "phase_type": "main",
+      "opens_at": "2026-10-26T17:00:00+08:00",
+      "unlock_condition": "通关第八节并累计 160000 歌姬点数",
+      "summary": "开放第九节，并继续追加高阶自由本。",
+      "quest_ids": ["halloween_2026_main_9"],
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "phase_id": "halloween_2026_phase_6",
+      "name": "第十节 / 追加关卡 / 从者正式加入",
+      "phase_type": "main",
+      "opens_at": "2026-10-27T17:00:00+08:00",
+      "unlock_condition": "通关第九节并累计 310000 歌姬点数",
+      "summary": "开放主线第十节、追加关卡和 90++ 自由本；终结的伊丽莎白正式加入。",
+      "quest_ids": [
+        "halloween_2026_main_10",
+        "halloween_2026_free_9",
+        "halloween_2026_extra_1",
+        "halloween_2026_extra_2",
+        "halloween_2026_extra_3",
+        "halloween_2026_extra_4"
+      ],
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    },
+    {
+      "phase_id": "halloween_2026_phase_7",
+      "name": "挑战关卡",
+      "phase_type": "challenge",
+      "opens_at": "2026-10-28T17:00:00+08:00",
+      "unlock_condition": "通关活动第十节与终局特异点",
+      "summary": "开放高难度挑战关卡；首次通关获得传承结晶。",
+      "quest_ids": ["halloween_2026_challenge_1"],
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    }
+  ],
+  "quests": [
+    {
+      "quest_id": "halloween_2026_main_0",
+      "name": "序幕「恰赫季斯金字塔姬路城拆除工程开始」",
+      "quest_type": "main",
+      "location": "迦勒底之门",
+      "ap_cost": 0,
+      "recommended_level": "—",
+      "unlock_condition": "通关特异点F",
+      "available_from": "2026-10-22T19:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["火星射击 ×1"],
+      "tags": ["主线", "序幕"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_1",
+      "name": "第一节「南瓜世界」",
+      "quest_type": "main",
+      "location": "新亚马逊平原",
+      "ap_cost": 10,
+      "recommended_level": "20",
+      "unlock_condition": "通关序幕",
+      "available_from": "2026-10-22T19:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1"],
+      "tags": ["主线", "古代火星人", "弓阶"],
+      "enemy_waves": ["两场战斗，敌方以弓阶古代火星人为主"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_2",
+      "name": "第二节「邪教伊丽莎白」",
+      "quest_type": "main",
+      "location": "第一仓储库",
+      "ap_cost": 5,
+      "recommended_level": "40",
+      "unlock_condition": "通关第一节",
+      "available_from": "2026-10-22T19:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1"],
+      "tags": ["主线", "渡边纲", "剑阶"],
+      "enemy_waves": ["渡边纲（业炎的渡边，剑阶，55，三段 HP）"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_3",
+      "name": "第三节「カ星の槍」",
+      "quest_type": "main",
+      "location": "第二仓储库",
+      "ap_cost": 5,
+      "recommended_level": "50",
+      "unlock_condition": "通关第二节并累计 25000 歌姬点数",
+      "available_from": "2026-10-23T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1"],
+      "tags": ["主线", "赫克托耳", "弓阶"],
+      "enemy_waves": ["两场战斗；Boss 为赫克托耳（太阳的帕里斯，弓阶，70，两段 HP）"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_4",
+      "name": "第四节「デッドエンド・ハロウィン」",
+      "quest_type": "main",
+      "location": "阿尔西亚山",
+      "ap_cost": 5,
+      "recommended_level": "40",
+      "unlock_condition": "通关第三节",
+      "available_from": "2026-10-23T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1"],
+      "tags": ["主线", "肃正骑士"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_5",
+      "name": "第五节「ロード・オブ・ザ・ランス」",
+      "quest_type": "main",
+      "location": "帕沃尼斯山",
+      "ap_cost": 5,
+      "recommended_level": "40",
+      "unlock_condition": "通关第四节并累计 60000 歌姬点数",
+      "available_from": "2026-10-24T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1"],
+      "tags": ["主线", "肃正骑士"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_6",
+      "name": "第六节「カ星に住むオリュンポスの神々」",
+      "quest_type": "main",
+      "location": "帕沃尼斯山麓 / 阿斯克勒俄斯山麓",
+      "ap_cost": 5,
+      "recommended_level": "45",
+      "unlock_condition": "通关第五节",
+      "available_from": "2026-10-24T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1"],
+      "tags": ["主线", "圣诞Alter", "骑阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_7",
+      "name": "第七节「王の帰還」",
+      "quest_type": "main",
+      "location": "阿斯克勒俄斯山",
+      "ap_cost": 0,
+      "recommended_level": "—",
+      "unlock_condition": "通关第六节并累计 100000 歌姬点数",
+      "available_from": "2026-10-25T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1"],
+      "tags": ["主线", "剧情"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_8",
+      "name": "第八节「メッセージ は １件 です」",
+      "quest_type": "main",
+      "location": "第三仓储库 / 崖边坡道",
+      "ap_cost": 5,
+      "recommended_level": "35",
+      "unlock_condition": "通关第七节",
+      "available_from": "2026-10-25T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1"],
+      "tags": ["主线", "鬼魂", "术阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_9",
+      "name": "第九节「エリちゃん、どうする？」",
+      "quest_type": "main",
+      "location": "恰赫季斯城 / 第一仓储库",
+      "ap_cost": 10,
+      "recommended_level": "60",
+      "unlock_condition": "通关第八节并累计 160000 歌姬点数",
+      "available_from": "2026-10-26T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1"],
+      "tags": ["主线", "キングエリザ", "降阶"],
+      "enemy_waves": ["多面战斗；Boss 为キングエリザ（降阶，90，多段 HP）"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_main_10",
+      "name": "第十节「パーフェクト・エリザベート！」",
+      "quest_type": "main",
+      "location": "恰赫季斯城",
+      "ap_cost": 5,
+      "recommended_level": "60",
+      "unlock_condition": "通关第九节并累计 310000 歌姬点数",
+      "available_from": "2026-10-27T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["圣晶石 ×1", "圣杯 ×1", "终结的伊丽莎白（正式加入）"],
+      "tags": ["主线", "キングエリザ", "降阶"],
+      "enemy_waves": ["キングエリザ（降阶，90，多段 HP）"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_free_1",
+      "name": "Ｍ星之旅 小心宇宙海盗！",
+      "quest_type": "free",
+      "location": "第一仓储库",
+      "ap_cost": 30,
+      "recommended_level": "15",
+      "unlock_condition": "通关第二节",
+      "available_from": "2026-10-22T19:00:00+08:00",
+      "repeatable": true,
+      "tags": ["自由本", "骑阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_free_2",
+      "name": "Ｍ星之旅 被赏金猎人盯上了！",
+      "quest_type": "free",
+      "location": "第一仓储库",
+      "ap_cost": 35,
+      "recommended_level": "25",
+      "unlock_condition": "通关第二节",
+      "available_from": "2026-10-22T19:00:00+08:00",
+      "repeatable": true,
+      "tags": ["自由本", "弓阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_free_3",
+      "name": "Ｍ星之旅 尊享配送很危险！",
+      "quest_type": "free",
+      "location": "新亚马逊平原",
+      "ap_cost": 40,
+      "recommended_level": "40",
+      "unlock_condition": "通关第二节",
+      "available_from": "2026-10-22T19:00:00+08:00",
+      "repeatable": true,
+      "tags": ["自由本", "狂阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_free_4",
+      "name": "カ星ツアー 賞金首を捕まえて！",
+      "quest_type": "free",
+      "location": "阿尔西亚山",
+      "ap_cost": 40,
+      "recommended_level": "60",
+      "unlock_condition": "通关第四节",
+      "available_from": "2026-10-23T17:00:00+08:00",
+      "repeatable": true,
+      "tags": ["自由本", "术阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_free_5",
+      "name": "カ星ツアー 映画の主題歌ならおまかせ！",
+      "quest_type": "free",
+      "location": "帕沃尼斯山",
+      "ap_cost": 40,
+      "recommended_level": "70",
+      "unlock_condition": "通关第六节",
+      "available_from": "2026-10-24T17:00:00+08:00",
+      "repeatable": true,
+      "tags": ["自由本", "枪阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_free_6",
+      "name": "カ星ツアー 山の頂にはダイヤモンド！",
+      "quest_type": "free",
+      "location": "阿斯克勒俄斯山",
+      "ap_cost": 40,
+      "recommended_level": "80",
+      "unlock_condition": "通关第八节",
+      "available_from": "2026-10-25T17:00:00+08:00",
+      "repeatable": true,
+      "tags": ["自由本", "剑阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_free_7",
+      "name": "カ星ツアー 襲来！ インベーダー！",
+      "quest_type": "free",
+      "location": "第三仓储库",
+      "ap_cost": 40,
+      "recommended_level": "90",
+      "unlock_condition": "通关第九节",
+      "available_from": "2026-10-26T17:00:00+08:00",
+      "repeatable": true,
+      "tags": ["自由本", "杀阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_free_8",
+      "name": "カ星ツアー お城が魔竜に乗っ取られたわ！？",
+      "quest_type": "free",
+      "location": "恰赫季斯城",
+      "ap_cost": 40,
+      "recommended_level": "90+",
+      "unlock_condition": "通关第十节",
+      "available_from": "2026-10-27T17:00:00+08:00",
+      "repeatable": true,
+      "tags": ["自由本", "狂阶", "90+"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_free_9",
+      "name": "カ星ツアー 対決！ 宇宙的アーティスト！",
+      "quest_type": "free",
+      "location": "第二仓储库",
+      "ap_cost": 40,
+      "recommended_level": "90++",
+      "unlock_condition": "通关第十节",
+      "available_from": "2026-10-27T17:00:00+08:00",
+      "repeatable": true,
+      "tags": ["自由本", "90++", "弓阶"],
+      "enemy_waves": [
+        "第一面：过激派亲卫队（弓阶）3 名，HP 约 5.1 万",
+        "第二面：ゴンドラゴン（弓阶，43，HP 247658）",
+        "第三面：崔斯坦（弓阶，80，HP 802953）"
+      ],
+      "notes": [
+        "Mooncell 日文中文译名尚未统一；关卡标识以 90++ 与日文原名核对。",
+        "敌方职阶为弓阶，组队时应与以往骑阶 90++ 区分。"
+      ],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_extra_1",
+      "name": "【竜殺剣クエスト】業炎のワタナベ",
+      "quest_type": "event",
+      "location": "帕沃尼斯山",
+      "ap_cost": 5,
+      "recommended_level": "80",
+      "unlock_condition": "通关第十节",
+      "available_from": "2026-10-27T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["终结的伊丽莎白（宝具强化专用灵基）"],
+      "tags": ["追加关卡", "剑阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_extra_2",
+      "name": "【竜殺剣クエスト】復活のP",
+      "quest_type": "event",
+      "location": "恰赫季斯城",
+      "ap_cost": 5,
+      "recommended_level": "80",
+      "unlock_condition": "通关第十节",
+      "available_from": "2026-10-27T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["终结的伊丽莎白（宝具强化专用灵基）"],
+      "tags": ["追加关卡", "弓阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_extra_3",
+      "name": "【竜殺剣クエスト】鮮血のウィドウヒルト",
+      "quest_type": "event",
+      "location": "阿斯克勒俄斯山",
+      "ap_cost": 5,
+      "recommended_level": "80",
+      "unlock_condition": "通关第十节",
+      "available_from": "2026-10-27T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["终结的伊丽莎白（宝具强化专用灵基）"],
+      "tags": ["追加关卡", "狂阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_extra_4",
+      "name": "【竜殺剣クエスト】絶対勝利のジークフリート",
+      "quest_type": "event",
+      "location": "阿尔西亚山",
+      "ap_cost": 5,
+      "recommended_level": "80",
+      "unlock_condition": "通关第十节",
+      "available_from": "2026-10-27T17:00:00+08:00",
+      "repeatable": false,
+      "first_clear_reward": ["终结的伊丽莎白（宝具强化专用灵基）"],
+      "tags": ["追加关卡", "剑阶"],
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "quest_id": "halloween_2026_challenge_1",
+      "name": "【高难易度】LIVE FES ～WE ARE ELIZABETH～",
+      "quest_type": "challenge",
+      "location": "恰赫季斯城",
+      "ap_cost": 5,
+      "recommended_level": "90+",
+      "unlock_condition": "通关终局特异点与活动第十节",
+      "available_from": "2026-10-28T17:00:00+08:00",
+      "repeatable": true,
+      "first_clear_reward": ["传承结晶 ×1"],
+      "tags": ["挑战关卡", "伊丽莎白"],
+      "source_ids": ["official-18491", "mooncell-halloween-2026"]
+    }
+  ],
+  "missions": [],
+  "shop_items": [
+    {
+      "item_id": "halloween_2026_eliza_headband",
+      "name": "终焉的头箍",
+      "currency": "活动道具",
+      "cost": 50,
+      "stock": 4,
+      "priority": "high",
+      "notes": "终结的伊丽莎白灵基再临素材",
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "item_id": "halloween_2026_event_ce",
+      "name": "致遥远星球上的我",
+      "currency": "活动道具",
+      "cost": 150,
+      "stock": 4,
+      "priority": "high",
+      "notes": "活动限定 ★5 概念礼装",
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "item_id": "halloween_2026_crystallized_lore",
+      "name": "传承结晶",
+      "currency": "活动道具",
+      "cost": 300,
+      "stock": 4,
+      "priority": "high",
+      "notes": "技能强化素材",
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "item_id": "halloween_2026_sun_fou",
+      "name": "英灵结晶·日轮之芙芙",
+      "currency": "活动道具",
+      "cost": 150,
+      "stock": 2,
+      "priority": "high",
+      "notes": "★4 ALL ATK 提升",
+      "source_ids": ["mooncell-halloween-2026"]
+    },
+    {
+      "item_id": "halloween_2026_star_fou",
+      "name": "英灵结晶·流星之芙芙",
+      "currency": "活动道具",
+      "cost": 150,
+      "stock": 2,
+      "priority": "high",
+      "notes": "★4 ALL HP 提升",
+      "source_ids": ["mooncell-halloween-2026"]
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "official-18491",
+      "title": "【限时】「终结·万圣节2026~于南瓜星闪耀的歌姬~」举办！",
+      "url": "https://game.bilibili.com/fgo/news.html#!news/0/1/18491",
+      "source_type": "official",
+      "publisher": "国服官方",
+      "fetched_at": "2026-10-23T15:00:00+08:00",
+      "confidence": 1.0,
+      "verification_status": "verified"
+    },
+    {
+      "source_id": "mooncell-halloween-2026",
+      "title": "Mooncell：终结·万圣节2026 活动、关卡配置与活动商店",
+      "url": "https://fgo.wiki/w/终结·万圣节2025_～于南瓜星闪耀的歌姬～",
+      "source_type": "wiki",
+      "publisher": "fgo.wiki",
+      "fetched_at": "2026-10-23T15:00:00+08:00",
+      "confidence": 0.95,
+      "verification_status": "verified"
+    }
+  ],
+  "observations": []
+}
