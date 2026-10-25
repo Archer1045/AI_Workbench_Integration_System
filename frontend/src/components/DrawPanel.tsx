@@ -151,6 +151,7 @@ const NEGATIVE_BLOCK_LABELS: Record<keyof PromptDocumentV1['negative'], string> 
   quality: '质量',
   anatomy: '人体结构',
   composition: '构图',
+  scene: '场景',
   style: '风格',
   content: '内容',
   custom: '自定义',
@@ -2260,6 +2261,23 @@ export default function DrawPanel({
                   }
                 />
               ))}
+              <PromptBlockEditor
+                label="角色负向"
+                block={activeCharacter.negative}
+                onChange={(block) =>
+                  updateGroupDocument(
+                    group.id,
+                    updateCharacter(
+                      document,
+                      activeCharacter.id,
+                      (character) => ({
+                        ...character,
+                        negative: block,
+                      }),
+                    ),
+                  )
+                }
+              />
             </div>
             <PromptBlockEditor
               label="角色道具"

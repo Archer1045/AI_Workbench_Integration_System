@@ -15,6 +15,7 @@ const CHARACTER_LABELS: Record<string, string> = {
   pose_or_action: '动作',
   expression: '表情',
   state: '状态',
+  negative: '角色负向',
 };
 const CHARACTER_BLOCK_ENTRIES = [
   { key: 'appearance', label: '外貌' },
@@ -23,6 +24,7 @@ const CHARACTER_BLOCK_ENTRIES = [
   { key: 'pose_or_action', label: '动作' },
   { key: 'expression', label: '表情' },
   { key: 'state', label: '状态' },
+  { key: 'negative', label: '角色负向' },
 ] as const;
 
 const GLOBAL_LABELS: Record<string, string> = {
@@ -32,6 +34,15 @@ const GLOBAL_LABELS: Record<string, string> = {
   camera: '镜头',
   lighting: '光照',
   constraints: '约束',
+};
+const NEGATIVE_LABELS: Record<string, string> = {
+  quality: '质量',
+  anatomy: '人体结构',
+  composition: '构图',
+  scene: '场景',
+  style: '风格',
+  content: '内容',
+  custom: '自定义',
 };
 
 function sourceLabel(source?: string): string {
@@ -159,7 +170,24 @@ function StructuredOutline({
 
       <section className="draw-outline-section">
         <div className="draw-outline-section-title">
-          <strong>负面提示词</strong>
+          <strong>全局负向分层</strong>
+        </div>
+        <div className="draw-outline-grid">
+          {(Object.keys(NEGATIVE_LABELS) as Array<
+            keyof PromptDocumentV1['negative']
+          >).map((key) => (
+            <BlockOutline
+              key={key}
+              label={NEGATIVE_LABELS[key]}
+              block={document.negative[key]}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="draw-outline-section">
+        <div className="draw-outline-section-title">
+          <strong>最终负向提示词</strong>
         </div>
         <div className="draw-outline-tags">
           {negativePrompt

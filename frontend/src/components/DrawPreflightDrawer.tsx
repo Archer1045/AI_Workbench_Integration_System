@@ -62,12 +62,24 @@ export default function DrawPreflightDrawer({
   const negativeLayers = readyGroups.flatMap((group) => {
     if (group.mode !== 'structured' || !group.prompt_document) return [];
     const blocks = group.prompt_document.negative;
-    return Object.entries(blocks)
+    const globalLayers = Object.entries(blocks)
       .filter(([, block]) => block.tags.length > 0)
       .map(([kind, block]) => ({
         kind,
         count: block.tags.length,
       }));
+    const characterLayers = group.prompt_document.characters.flatMap(
+      (character) =>
+        character.negative.tags.length > 0
+          ? [
+              {
+                kind: `${character.role_id}:角色负向`,
+                count: character.negative.tags.length,
+              },
+            ]
+          : [],
+    );
+    return [...globalLayers, ...characterLayers];
   });
 
   return (

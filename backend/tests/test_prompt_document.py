@@ -430,6 +430,7 @@ def test_extended_fields_and_props_resolve_in_stable_order():
                         "intensity": 0.8,
                     },
                     "state": {"tags": ["sweat"]},
+                    "negative": {"tags": ["bad hands"]},
                 }
             ],
             "props": {
@@ -437,6 +438,7 @@ def test_extended_fields_and_props_resolve_in_stable_order():
                 "characters": {"girlA": {"tags": ["book"]}},
             },
             "interaction": {"action_tags": ["holding hands"]},
+            "negative": {"scene": {"tags": ["extra people"]}},
         }
     )
 
@@ -473,3 +475,20 @@ def test_extended_fields_and_props_resolve_in_stable_order():
     positions = [prompt.index(value) for value in expected_order]
     assert positions == sorted(positions)
     assert resolved["resolved_document"]["characters"][0]["expression"]["intensity"] == 0.8
+    assert "bad hands" in resolved["negative_prompt"]
+    assert "for the first girl (Hero): bad hands" in resolved["negative_prompt"]
+    assert "extra people" in resolved["negative_prompt"]
+
+
+def test_positive_negative_overlap_is_warning_not_error():
+    resolved = prompt_document.resolve_document(
+        {
+            "mode": "structured",
+            "global": {"quality": {"tags": ["blurry"]}},
+            "negative": {"quality": {"tags": ["blurry"]}},
+        }
+    )
+
+    assert resolved["blocked"] is False
+    assert any("正向和负向提示词同时包含" in item for item in resolved["warnings"])
+    assert not any("正向和负向提示词同时包含" in item for item in resolved["errors"])

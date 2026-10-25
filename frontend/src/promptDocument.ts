@@ -31,6 +31,7 @@ export const NEGATIVE_BLOCK_KINDS = [
   'quality',
   'anatomy',
   'composition',
+  'scene',
   'style',
   'content',
   'custom',
@@ -252,7 +253,13 @@ export function createPromptCharacter(index = 0, overrides: Partial<PromptCharac
       ...character,
       [kind]: normalizeBlock((overrides as Record<string, unknown>)[kind], kind),
     }),
-    base as PromptCharacter,
+    {
+      ...(base as PromptCharacter),
+      negative: normalizeBlock(
+        (overrides as Record<string, unknown>).negative,
+        'negative',
+      ),
+    },
   );
 }
 
@@ -284,6 +291,7 @@ function createBaseDocument(mode: 'structured' | 'legacy'): PromptDocumentV1 {
       quality: createPromptBlock('quality'),
       anatomy: createPromptBlock('anatomy'),
       composition: createPromptBlock('composition'),
+      scene: createPromptBlock('scene'),
       style: createPromptBlock('style'),
       content: createPromptBlock('content'),
       custom: createPromptBlock('custom'),
@@ -379,6 +387,7 @@ export function normalizePromptDocument(raw: unknown): PromptDocumentV1 {
       quality: normalizeBlock(negativeRaw.quality, 'quality'),
       anatomy: normalizeBlock(negativeRaw.anatomy, 'anatomy'),
       composition: normalizeBlock(negativeRaw.composition, 'composition'),
+      scene: normalizeBlock(negativeRaw.scene, 'scene'),
       style: normalizeBlock(negativeRaw.style, 'style'),
       content: normalizeBlock(negativeRaw.content, 'content'),
       custom: normalizeBlock(negativeRaw.custom, 'custom'),
@@ -448,6 +457,7 @@ export function isPromptDocumentEmpty(document: PromptDocumentV1 | null | undefi
   const hasBlock = (block: PromptBlock) => hasPromptBlockContent(block);
   if (Object.values(normalized.global).some(hasBlock)) return false;
   if (Object.values(normalized.negative).some(hasBlock)) return false;
+  if (normalized.characters.some((character) => hasBlock(character.negative))) return false;
   if (hasBlock(normalized.props.global)) return false;
   if (Object.values(normalized.props.characters).some(hasBlock)) return false;
   if (normalized.characters.some((character) => CHARACTER_BLOCK_KINDS.some((kind) => hasBlock(character[kind])))) return false;

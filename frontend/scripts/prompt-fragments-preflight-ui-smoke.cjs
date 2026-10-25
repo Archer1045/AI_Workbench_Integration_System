@@ -103,6 +103,24 @@ const DRAW_STATE_KEY = 'rider-studio:draw-state-v2';
   await shoot('prompt_fragments', fragmentDrawer);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(400);
+  const advancedTrigger = card.getByText('高级结构化编辑', { exact: true });
+  if (await advancedTrigger.isVisible().catch(() => false)) {
+    await card.locator('.structured-editor-collapse .ant-collapse-header').click();
+    await page.waitForTimeout(300);
+  }
+  await card.getByLabel('角色负向').fill('bad anatomy');
+  const negativeSection = card
+    .locator('.ant-collapse-item')
+    .filter({ hasText: '结构化负向提示词' })
+    .first();
+  await negativeSection
+    .getByText('结构化负向提示词', { exact: true })
+    .click();
+  await page.waitForTimeout(300);
+  await negativeSection
+    .getByRole('textbox', { name: '场景', exact: true })
+    .fill('extra people');
+  await page.waitForTimeout(500);
   await page.waitForTimeout(1800);
 
   await page.getByRole('button', { name: '版本历史' }).click();
@@ -130,6 +148,8 @@ const DRAW_STATE_KEY = 'rider-studio:draw-state-v2';
     fragment: {
       lightingTags: document?.global?.lighting?.tags || [],
       negativeAnatomyTags: document?.negative?.anatomy?.tags || [],
+      characterNegativeTags: document?.characters?.[0]?.negative?.tags || [],
+      sceneNegativeTags: document?.negative?.scene?.tags || [],
       favoriteStored: Boolean(
         await page.evaluate(() =>
           localStorage.getItem(
@@ -142,6 +162,8 @@ const DRAW_STATE_KEY = 'rider-studio:draw-state-v2';
       hasReadyGroups: preflightText.includes('可提交组'),
       hasRequestedCount: preflightText.includes('计划张数'),
       hasAnatomyLayer: preflightText.includes('anatomy: 4'),
+      hasSceneLayer: preflightText.includes('scene: 1'),
+      hasCharacterLayer: preflightText.includes('girlA:角色负向: 1'),
       hasModel: preflightText.includes('chosenIrisesMix'),
     },
     history: {
@@ -165,6 +187,8 @@ const DRAW_STATE_KEY = 'rider-studio:draw-state-v2';
     generationRequests > 0 ||
     !report.fragment.lightingTags.includes('cinematic lighting') ||
     !report.fragment.negativeAnatomyTags.includes('bad hands') ||
+    !report.fragment.characterNegativeTags.includes('bad anatomy') ||
+    !report.fragment.sceneNegativeTags.includes('extra people') ||
     !report.fragment.favoriteStored ||
     report.history.versions < 1 ||
     !Object.values(report.preflight).every(Boolean);

@@ -305,4 +305,26 @@ describe('prompt document model', () => {
     expect(withCharacter.props.characters.girlA.tags).toEqual(['book']);
     expect(withCharacter.characters[0].clothing.tags).toEqual([]);
   });
+
+  it('keeps scene and per-character negative layers', () => {
+    const document = normalizePromptDocument({
+      mode: 'structured',
+      characters: [
+        {
+          id: 'hero',
+          role_id: 'girlA',
+          display_name: 'Hero',
+          gender: '女',
+          negative: { tags: ['bad hands'] },
+        },
+      ],
+      negative: {
+        scene: { tags: ['extra people'] },
+      },
+    });
+
+    expect(document.characters[0].negative.tags).toEqual(['bad hands']);
+    expect(document.negative.scene.tags).toEqual(['extra people']);
+    expect(isPromptDocumentEmpty(document)).toBe(false);
+  });
 });

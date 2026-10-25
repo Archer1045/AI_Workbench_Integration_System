@@ -96,7 +96,15 @@ BODY_BUILD_PROMPTS: dict[str, tuple[str, ...]] = {
     ),
 }
 GLOBAL_BLOCKS = ("quality", "style", "scene", "camera", "lighting", "constraints")
-NEGATIVE_BLOCKS = ("quality", "anatomy", "composition", "style", "content", "custom")
+NEGATIVE_BLOCKS = (
+    "quality",
+    "anatomy",
+    "composition",
+    "scene",
+    "style",
+    "content",
+    "custom",
+)
 APPEARANCE_CATEGORIES = (
     "角色",
     "脸部",
@@ -299,6 +307,7 @@ def _character(raw: object, index: int) -> dict:
     }
     for kind in CHARACTER_BLOCKS:
         item[kind] = _block(data.get(kind), kind)
+    item["negative"] = _block(data.get("negative"), "negative")
     return item
 
 
@@ -629,6 +638,7 @@ def resolve_document(
         rating = "R18"
 
     character_fragments: list[str] = []
+    character_negative_fragments: list[str] = []
     for character in characters:
         selected_ids: list[str] = []
         parts: list[str] = []
@@ -662,6 +672,17 @@ def resolve_document(
                     used_ids.extend(props_ids)
                     if props_rating == "R18":
                         rating = "R18"
+        negative_block = character.get("negative") or {}
+        if negative_block.get("enabled", True):
+            negative_tags, negative_ids, negative_rating = _block_tags(
+                negative_block,
+                character=character,
+                role_id=character["role_id"],
+            )
+            character_negative_fragments.extend(negative_tags)
+            used_ids.extend(negative_ids)
+            if negative_rating == "R18":
+                rating = "R18"
         if len(character["clothing"].get("preset_refs") or []) > 3:
             errors.append(f"{character['display_name']} 的服装超过 3 个")
         if len(character["body_modifications"].get("preset_refs") or []) > 2:
@@ -703,7 +724,19 @@ def resolve_document(
         block = document["negative"][kind]
         if block.get("enabled", True):
             negative_blocks.append(", ".join(_tags(block.get("tags") or [])))
+    negative_blocks.extend(character_negative_fragments)
     negative = ", ".join(item for item in negative_blocks if item)
+    overlap = sorted(
+        {
+            tag.casefold()
+            for tag in _tags(positive)
+            if tag.casefold() in {item.casefold() for item in _tags(negative)}
+        }
+    )
+    if overlap:
+        warnings.append(
+            "正向和负向提示词同时包含：" + ", ".join(overlap)
+        )
 
     if len(set(used_ids)) > config.PRESET_COMPOSITION_MAX_ITEMS:
         errors.append(f"单个文档最多引用 {config.PRESET_COMPOSITION_MAX_ITEMS} 个预设")

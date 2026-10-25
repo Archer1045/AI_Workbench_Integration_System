@@ -900,6 +900,7 @@ export interface PromptCharacter {
   pose_or_action: PromptBlock;
   expression: PromptBlock;
   state: PromptBlock;
+  negative: PromptBlock;
 }
 
 export interface PromptDocumentV1 {
@@ -922,7 +923,7 @@ export interface PromptDocumentV1 {
     global_tags: string[];
     user_notes: string;
   };
-  negative: Record<'quality' | 'anatomy' | 'composition' | 'style' | 'content' | 'custom', PromptBlock>;
+  negative: Record<'quality' | 'anatomy' | 'composition' | 'scene' | 'style' | 'content' | 'custom', PromptBlock>;
   raw_override: {
     prompt: string;
     negative_prompt: string;
