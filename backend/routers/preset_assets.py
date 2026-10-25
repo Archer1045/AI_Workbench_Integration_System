@@ -210,6 +210,8 @@ def create_crop_candidate(
     params = dict(payload.get("params") or {})
     if preset_type == "character":
         params["preset_version"] = int(preset.get("version") or 1)
+    if preset_type == "outfit":
+        params["content_hash"] = str(preset.get("content_hash") or "")
     return service.create_crop_candidate(
         preset_type,
         preset_id,

@@ -18,7 +18,10 @@ const PRESET_ASSET_KINDS: PresetAssetKind[] = [
   'clothing',
   'scene',
   'body',
+  'expansion',
+  'toy',
   'character',
+  'outfit',
 ];
 
 const SEED_STRATEGIES = new Set<PresetAssetSeedStrategy>([

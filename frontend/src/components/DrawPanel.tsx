@@ -10,6 +10,7 @@ import {
     type LoraItem,
     type ModelItem,
     type ExpressionPreset,
+    type OutfitSetDefinition,
     type PoseCatalogItem,
     type PresetComposition,
   type PresetCatalog,
@@ -30,6 +31,7 @@ import ClothingPresetsModal from './ClothingPresetsModal';
 import ExpressionPresetsModal from './ExpressionPresetsModal';
 import PresetCompositionDrawer, { type PresetCompositionApplyMode } from './PresetCompositionDrawer';
 import PresetCenterDrawer from './PresetCenterDrawer';
+import OutfitSetDrawer from './OutfitSetDrawer';
 import type {
   PresetLibraryApplyOptions,
   PresetLibraryItem,
@@ -106,6 +108,7 @@ import {
   updateNegativeBlock,
   updateRawOverride,
 } from '../promptDocument';
+import { applyOutfitSetToDocument } from '../outfitSets';
 import {
   addGroup,
   clearDrawResult,
@@ -530,6 +533,7 @@ export default function DrawPanel({
   const [waterPresetsOpen, setWaterPresetsOpen] = useState(false);
   const [presetCompositionOpen, setPresetCompositionOpen] = useState(false);
   const [presetCenterOpen, setPresetCenterOpen] = useState(false);
+  const [outfitSetOpen, setOutfitSetOpen] = useState(false);
   const [compositionInitialSelection, setCompositionInitialSelection] =
     useState<{
       kind: string;
@@ -1311,6 +1315,11 @@ export default function DrawPanel({
       message.info('请在角色外貌工具中选择角色槽位后应用');
       return;
     }
+    if (kind === 'outfit') {
+      setPresetCenterOpen(false);
+      setOutfitSetOpen(true);
+      return;
+    }
     openLibraryComposition(kind, item);
   };
 
@@ -1410,6 +1419,41 @@ export default function DrawPanel({
       const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
       message.error(detail || '组合写入结构化文档失败');
     }
+  };
+
+  const applyOutfitSet = (
+    outfit: OutfitSetDefinition & {
+      preset_id?: string;
+      version?: number;
+      content_hash: string;
+    },
+    scope: 'current' | 'all',
+  ) => {
+    let target =
+      drawStore.groups.find((group) => group.id === activeGroupId) ||
+      drawStore.groups[0];
+    if (!target) {
+      target = createDrawGroup(
+        outfit.prompt || '',
+        'group-outfit-set',
+        'structured',
+      );
+      drawStore.groups = [target];
+      setActiveGroupId(target.id);
+    }
+    if (target.mode === 'legacy') {
+      message.warning('服装套装只能写入结构化角色服装块，请先把当前组切换为结构化模式');
+      return false;
+    }
+    updateDocument(target.id, (document) =>
+      applyOutfitSetToDocument(
+        document,
+        outfit,
+        activeCharacterId,
+        scope,
+      ),
+    );
+    return true;
   };
 
   const applyCharacterAppearance = (apply: {
@@ -2568,6 +2612,13 @@ export default function DrawPanel({
         >
           预设选择器
         </Button>
+        <Button
+          block
+          onClick={() => setOutfitSetOpen(true)}
+          style={{ marginBottom: 8 }}
+        >
+          服装套装
+        </Button>
         <Button block onClick={() => setClothingSetOpen(true)} style={{ marginBottom: 8 }}>
           保存服装集
         </Button>
@@ -3323,6 +3374,15 @@ export default function DrawPanel({
         onOpenCharacter={() => {
           setPresetCenterOpen(false);
           setCharacterAppearanceOpen(true);
+        }}
+      />
+      <OutfitSetDrawer
+        open={outfitSetOpen}
+        onClose={() => setOutfitSetOpen(false)}
+        onApply={applyOutfitSet}
+        onManagePreview={(selection) => {
+          setOutfitSetOpen(false);
+          openPresetAssetWorkshop(selection);
         }}
       />
       <PromptSetsDrawer

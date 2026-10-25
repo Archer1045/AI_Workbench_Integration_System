@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import character_presets
 import character_prompt_presets
 import config
+import outfit_sets
 
 DB_PATH = config.DB_PATH
 
@@ -256,6 +257,43 @@ CREATE INDEX IF NOT EXISTS idx_character_appearance_presets_lookup
     ON character_appearance_presets(preset_id, version);
 CREATE INDEX IF NOT EXISTS idx_character_appearance_presets_filter
     ON character_appearance_presets(category, source, enabled);
+CREATE TABLE IF NOT EXISTS outfit_presets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    preset_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '用户套装',
+    gender_scope TEXT NOT NULL DEFAULT '女',
+    character_scope_json TEXT NOT NULL DEFAULT '[]',
+    source TEXT NOT NULL DEFAULT 'user',
+    version INTEGER NOT NULL DEFAULT 1,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    rating TEXT NOT NULL DEFAULT '普通',
+    content_hash TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(preset_id, version)
+);
+CREATE TABLE IF NOT EXISTS outfit_preset_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    outfit_preset_id INTEGER NOT NULL,
+    clothing_id TEXT NOT NULL,
+    slot TEXT NOT NULL,
+    colors_json TEXT NOT NULL DEFAULT '{}',
+    layer_state TEXT NOT NULL DEFAULT '完整',
+    layer_order INTEGER NOT NULL DEFAULT 0,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    covers_json TEXT NOT NULL DEFAULT '[]',
+    clothing_version INTEGER NOT NULL DEFAULT 1,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    UNIQUE(outfit_preset_id, layer_order)
+);
+CREATE INDEX IF NOT EXISTS idx_outfit_presets_lookup
+    ON outfit_presets(preset_id, version);
+CREATE INDEX IF NOT EXISTS idx_outfit_presets_filter
+    ON outfit_presets(category, source, enabled);
+CREATE INDEX IF NOT EXISTS idx_outfit_preset_items_outfit
+    ON outfit_preset_items(outfit_preset_id, layer_order);
 """
 
 _TABLES = {
@@ -266,7 +304,7 @@ _TABLES = {
 }
 
 # SQLite 版本化迁移：新库与旧库都从 user_version=0 开始依次执行。
-SCHEMA_VERSION = 31
+SCHEMA_VERSION = 32
 
 
 def get_connection() -> sqlite3.Connection:
@@ -1068,6 +1106,68 @@ def _migration_031_character_visual_corrections(conn: sqlite3.Connection) -> Non
     _migration_029_character_outfit_links(conn)
 
 
+def _migration_032_outfit_sets(conn: sqlite3.Connection) -> None:
+    """Add composable outfit sets and seed the initial built-in catalog."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS outfit_presets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            preset_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            category TEXT NOT NULL DEFAULT '用户套装',
+            gender_scope TEXT NOT NULL DEFAULT '女',
+            character_scope_json TEXT NOT NULL DEFAULT '[]',
+            source TEXT NOT NULL DEFAULT 'user',
+            version INTEGER NOT NULL DEFAULT 1,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            rating TEXT NOT NULL DEFAULT '普通',
+            content_hash TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(preset_id, version)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS outfit_preset_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            outfit_preset_id INTEGER NOT NULL,
+            clothing_id TEXT NOT NULL,
+            slot TEXT NOT NULL,
+            colors_json TEXT NOT NULL DEFAULT '{}',
+            layer_state TEXT NOT NULL DEFAULT '完整',
+            layer_order INTEGER NOT NULL DEFAULT 0,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            covers_json TEXT NOT NULL DEFAULT '[]',
+            clothing_version INTEGER NOT NULL DEFAULT 1,
+            snapshot_json TEXT NOT NULL DEFAULT '{}',
+            UNIQUE(outfit_preset_id, layer_order)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_outfit_presets_lookup
+        ON outfit_presets(preset_id, version)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_outfit_presets_filter
+        ON outfit_presets(category, source, enabled)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_outfit_preset_items_outfit
+        ON outfit_preset_items(outfit_preset_id, layer_order)
+        """
+    )
+    _seed_builtin_outfit_presets(conn)
+
+
 _MIGRATIONS = (
     _migration_001_compat,
     _migration_002_background_jobs,
@@ -1100,6 +1200,7 @@ _MIGRATIONS = (
     _migration_029_character_outfit_links,
     _migration_030_builtin_character_outfit_resync,
     _migration_031_character_visual_corrections,
+    _migration_032_outfit_sets,
 )
 
 
@@ -3095,6 +3196,319 @@ def _json_contains_preset_id(value: object, preset_id: str) -> bool:
     if isinstance(value, list):
         return any(_json_contains_preset_id(item, preset_id) for item in value)
     return False
+
+
+def _outfit_preset_row(
+    row: sqlite3.Row,
+    items: list[dict],
+) -> dict:
+    data = dict(row)
+    normalized_items = sorted(items, key=lambda item: int(item.get("order") or 0))
+    return {
+        "id": str(data["preset_id"]),
+        "row_id": int(data["id"]),
+        "preset_id": str(data["preset_id"]),
+        "name": str(data["name"]),
+        "description": str(data.get("description") or ""),
+        "category": str(data.get("category") or "用户套装"),
+        "gender_scope": str(data.get("gender_scope") or "女"),
+        "character_scope": _decode_json_tags(data.get("character_scope_json")),
+        "source": str(data.get("source") or "user"),
+        "version": int(data.get("version") or 1),
+        "enabled": bool(data.get("enabled")),
+        "rating": str(data.get("rating") or "普通"),
+        "content_hash": str(data.get("content_hash") or ""),
+        "prompt": outfit_sets.render_outfit_prompt(normalized_items),
+        "items": normalized_items,
+        "created_at": str(data["created_at"]),
+        "updated_at": str(data["updated_at"]),
+    }
+
+
+def _outfit_item_rows(
+    conn: sqlite3.Connection,
+    outfit_row_id: int,
+) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT * FROM outfit_preset_items
+        WHERE outfit_preset_id = ?
+        ORDER BY layer_order, id
+        """,
+        (outfit_row_id,),
+    ).fetchall()
+    items: list[dict] = []
+    for row in rows:
+        snapshot = _decode_json_object(row["snapshot_json"])
+        colors = _decode_json_object(row["colors_json"])
+        items.append(
+            {
+                "clothing_id": str(row["clothing_id"]),
+                "slot": str(row["slot"]),
+                "colors": colors,
+                "layer_state": str(row["layer_state"] or "完整"),
+                "order": int(row["layer_order"] or 0),
+                "enabled": bool(row["enabled"]),
+                "covers": _decode_json_tags(row["covers_json"]),
+                "clothing_version": int(row["clothing_version"] or 1),
+                "snapshot": snapshot,
+            }
+        )
+    return items
+
+
+def _decode_json_object(value) -> dict:
+    if isinstance(value, dict):
+        return dict(value)
+    try:
+        decoded = json.loads(str(value or "{}"))
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return decoded if isinstance(decoded, dict) else {}
+
+
+def _insert_outfit_row(
+    conn: sqlite3.Connection,
+    *,
+    preset_id: str,
+    normalized: dict,
+    source: str,
+    version: int,
+) -> int:
+    now = now_iso()
+    cursor = conn.execute(
+        """
+        INSERT INTO outfit_presets (
+            preset_id, name, description, category, gender_scope,
+            character_scope_json, source, version, enabled, rating,
+            content_hash, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+        """,
+        (
+            preset_id,
+            normalized["name"],
+            normalized["description"],
+            normalized["category"],
+            normalized["gender_scope"],
+            json.dumps(normalized["character_scope"], ensure_ascii=False),
+            source,
+            version,
+            normalized["rating"],
+            normalized["content_hash"],
+            now,
+            now,
+        ),
+    )
+    outfit_row_id = int(cursor.lastrowid)
+    for item in normalized["items"]:
+        conn.execute(
+            """
+            INSERT INTO outfit_preset_items (
+                outfit_preset_id, clothing_id, slot, colors_json,
+                layer_state, layer_order, enabled, covers_json,
+                clothing_version, snapshot_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                outfit_row_id,
+                item["clothing_id"],
+                item["slot"],
+                json.dumps(item["colors"], ensure_ascii=False, sort_keys=True),
+                item["layer_state"],
+                int(item["order"]),
+                1 if item["enabled"] else 0,
+                json.dumps(item["covers"], ensure_ascii=False),
+                int(item["clothing_version"]),
+                json.dumps(item["snapshot"], ensure_ascii=False, sort_keys=True),
+            ),
+        )
+    return outfit_row_id
+
+
+def _seed_builtin_outfit_presets(conn: sqlite3.Connection) -> None:
+    for raw in outfit_sets.BUILTIN_OUTFITS:
+        normalized = outfit_sets.normalize_outfit_payload(
+            {
+                **raw,
+                "gender_scope": raw.get("gender_scope", "女"),
+                "character_scope": raw.get("character_scope", []),
+            }
+        )
+        current = conn.execute(
+            """
+            SELECT id, version, content_hash
+            FROM outfit_presets
+            WHERE preset_id = ? AND source = 'builtin'
+            ORDER BY version DESC LIMIT 1
+            """,
+            (raw["preset_id"],),
+        ).fetchone()
+        if current and current["content_hash"] == normalized["content_hash"]:
+            continue
+        version = int(current["version"]) + 1 if current else 1
+        _insert_outfit_row(
+            conn,
+            preset_id=str(raw["preset_id"]),
+            normalized=normalized,
+            source="builtin",
+            version=version,
+        )
+
+
+def list_outfit_presets(
+    *,
+    keyword: str = "",
+    category: str = "",
+    source: str = "",
+    enabled: bool | None = None,
+    restricted: bool = False,
+) -> list[dict]:
+    """Return the latest version of every outfit preset."""
+    clauses = [
+        """
+        p.version = (
+            SELECT MAX(p2.version) FROM outfit_presets p2
+            WHERE p2.preset_id = p.preset_id
+        )
+        """
+    ]
+    params: list[object] = []
+    if keyword.strip():
+        like = f"%{keyword.strip()}%"
+        clauses.append(
+            "(p.name LIKE ? OR p.description LIKE ? OR p.category LIKE ? "
+            "OR p.preset_id LIKE ?)"
+        )
+        params.extend([like, like, like, like])
+    if category.strip():
+        clauses.append("p.category = ?")
+        params.append(category.strip())
+    if source.strip():
+        clauses.append("p.source = ?")
+        params.append(source.strip())
+    if enabled is not None:
+        clauses.append("p.enabled = ?")
+        params.append(1 if enabled else 0)
+    if restricted:
+        clauses.append("p.rating <> 'R18'")
+    where = " AND ".join(clauses)
+    with get_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT p.* FROM outfit_presets p
+            WHERE {where}
+            ORDER BY CASE p.source WHEN 'builtin' THEN 0 ELSE 1 END,
+                     p.updated_at DESC, p.id DESC
+            """,
+            params,
+        ).fetchall()
+        return [
+            _outfit_preset_row(row, _outfit_item_rows(conn, int(row["id"])))
+            for row in rows
+        ]
+
+
+def get_outfit_preset(
+    preset_id: str,
+    version: int | None = None,
+) -> dict | None:
+    with get_connection() as conn:
+        if version is None:
+            row = conn.execute(
+                """
+                SELECT * FROM outfit_presets
+                WHERE preset_id = ?
+                ORDER BY version DESC LIMIT 1
+                """,
+                (preset_id,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """
+                SELECT * FROM outfit_presets
+                WHERE preset_id = ? AND version = ?
+                """,
+                (preset_id, version),
+            ).fetchone()
+        if not row:
+            return None
+        return _outfit_preset_row(row, _outfit_item_rows(conn, int(row["id"])))
+
+
+def create_outfit_preset(
+    normalized: dict,
+    *,
+    preset_id: str | None = None,
+    source: str = "user",
+) -> dict:
+    stable_id = str(preset_id or f"outfit_user_{uuid.uuid4().hex[:12]}").strip()
+    normalized = {
+        **normalized,
+        "name": str(normalized.get("name") or "").strip(),
+    }
+    if not stable_id or not normalized["name"]:
+        raise ValueError("套装 ID 和名称不能为空")
+    with get_connection() as conn:
+        if conn.execute(
+            "SELECT 1 FROM outfit_presets WHERE preset_id = ? LIMIT 1",
+            (stable_id,),
+        ).fetchone():
+            raise ValueError("套装 ID 已存在")
+        row_id = _insert_outfit_row(
+            conn,
+            preset_id=stable_id,
+            normalized=normalized,
+            source=source,
+            version=1,
+        )
+    preset = get_outfit_preset(stable_id)
+    if not preset or preset["row_id"] != row_id:
+        raise RuntimeError("套装写入后读取失败")
+    return preset
+
+
+def update_outfit_preset(
+    preset_id: str,
+    normalized: dict,
+) -> dict:
+    current = get_outfit_preset(preset_id)
+    if not current:
+        raise KeyError(preset_id)
+    if current["source"] != "user":
+        raise PermissionError("内置套装只能另存为副本")
+    with get_connection() as conn:
+        next_version = int(current["version"]) + 1
+        row_id = _insert_outfit_row(
+            conn,
+            preset_id=preset_id,
+            normalized=normalized,
+            source="user",
+            version=next_version,
+        )
+    preset = get_outfit_preset(preset_id, next_version)
+    if not preset:
+        raise RuntimeError("套装更新后读取失败")
+    return preset
+
+
+def delete_outfit_preset(preset_id: str) -> int:
+    current = get_outfit_preset(preset_id)
+    if not current:
+        return 0
+    if current["source"] != "user":
+        raise PermissionError("内置套装不能删除")
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "DELETE FROM outfit_presets WHERE preset_id = ?",
+            (preset_id,),
+        )
+        conn.execute(
+            """
+            DELETE FROM outfit_preset_items
+            WHERE outfit_preset_id NOT IN (SELECT id FROM outfit_presets)
+            """
+        )
+        return int(cursor.rowcount)
 
 
 def companion_summary() -> dict:

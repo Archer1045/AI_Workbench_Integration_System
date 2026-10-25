@@ -218,7 +218,8 @@ export type PresetAssetKind =
   | 'body'
   | 'expansion'
   | 'toy'
-  | 'character';
+  | 'character'
+  | 'outfit';
 export type PresetAssetSeedStrategy = 'fixed' | 'random' | 'derive';
 export type PresetAssetCropMode = 'cover' | 'contain';
 export type PresetAssetCandidateStatus =
@@ -952,6 +953,8 @@ export interface DrawGroupInput {
 export interface CharacterAppearancePreset {
   id: number;
   preset_id: string;
+  label?: string;
+  translation?: string;
   name: string;
   work: string;
   category: string;
@@ -1098,6 +1101,105 @@ export interface ClothingPreset extends PresetTaxonomyFields {
   opacity?: string;
   pattern?: string;
   top?: string;
+}
+
+export type OutfitSlot =
+  | 'headwear'
+  | 'underwear'
+  | 'top'
+  | 'bottom'
+  | 'outerwear'
+  | 'full_body'
+  | 'legwear'
+  | 'footwear'
+  | 'accessory';
+
+export interface OutfitItemDraft {
+  clothing_id: string;
+  slot?: OutfitSlot;
+  colors?: Partial<Record<PresetColorSlot, string>>;
+  layer_state?: string;
+  order?: number;
+  enabled?: boolean;
+  covers?: OutfitSlot[];
+}
+
+export interface OutfitItemSnapshot {
+  id: string;
+  label: string;
+  translation: string;
+  category: string;
+  part: string;
+  tags: string[];
+  draw_prompt: string;
+  rating: string;
+  source: string;
+  schema_version: number;
+  layer_state: string;
+  materials: string[];
+  accessories: string[];
+}
+
+export interface StoredOutfitItem extends OutfitItemDraft {
+  clothing_id: string;
+  slot: OutfitSlot;
+  colors: Partial<Record<PresetColorSlot, string>>;
+  layer_state: string;
+  order: number;
+  enabled: boolean;
+  covers: OutfitSlot[];
+  clothing_version: number;
+  snapshot: OutfitItemSnapshot;
+}
+
+export interface OutfitSetDefinition {
+  schema_version?: number;
+  name: string;
+  description?: string;
+  category?: string;
+  gender_scope?: string;
+  character_scope?: string[];
+  rating?: string;
+  content_hash?: string;
+  prompt?: string;
+  occupied_slots?: string[];
+  warnings?: string[];
+  items: Array<OutfitItemDraft | StoredOutfitItem>;
+}
+
+export interface OutfitSetPreset {
+  id: string;
+  row_id: number;
+  preset_id: string;
+  label?: string;
+  translation?: string;
+  name: string;
+  description: string;
+  category: string;
+  gender_scope: string;
+  character_scope: string[];
+  source: 'builtin' | 'user' | string;
+  version: number;
+  enabled: boolean;
+  rating: string;
+  nsfw?: boolean;
+  has_image?: boolean;
+  image?: string | null;
+  content_hash: string;
+  prompt: string;
+  items: StoredOutfitItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OutfitSetCatalog {
+  items: OutfitSetPreset[];
+  total: number;
+  categories: string[];
+  slots: Array<{ value: OutfitSlot; label: string }>;
+  max_items: number;
+  restricted: boolean;
+  schema_version: number;
 }
 
 export interface ScenePreset extends PresetTaxonomyFields {

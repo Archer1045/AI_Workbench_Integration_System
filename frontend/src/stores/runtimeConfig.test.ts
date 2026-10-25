@@ -53,6 +53,12 @@ const expectedTargets = {
     format: 'WEBP',
     quality: 90,
   },
+  outfit: {
+    generation_size: [768, 1152],
+    output_size: [384, 576],
+    format: 'WEBP',
+    quality: 90,
+  },
 };
 
 describe('runtimeConfig', () => {

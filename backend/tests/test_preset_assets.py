@@ -46,9 +46,27 @@ EXPECTED_PRESET_ASSET_TARGETS = {
         "format": "WEBP",
         "quality": 90,
     },
+    "expansion": {
+        "generation_size": (768, 768),
+        "output_size": (384, 384),
+        "format": "WEBP",
+        "quality": 90,
+    },
+    "toy": {
+        "generation_size": (768, 768),
+        "output_size": (384, 384),
+        "format": "WEBP",
+        "quality": 90,
+    },
     "character": {
         "generation_size": (540, 960),
         "output_size": (270, 480),
+        "format": "WEBP",
+        "quality": 90,
+    },
+    "outfit": {
+        "generation_size": (768, 1152),
+        "output_size": (384, 576),
         "format": "WEBP",
         "quality": 90,
     },

@@ -88,6 +88,34 @@ def _character_presets() -> list[dict[str, Any]]:
     return items
 
 
+def _outfit_presets() -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for preset in database.list_outfit_presets():
+        tags: list[str] = []
+        seen: set[str] = set()
+        for item in preset.get("items") or []:
+            snapshot = item.get("snapshot") or {}
+            for tag in snapshot.get("tags") or []:
+                value = str(tag).strip()
+                key = value.casefold()
+                if value and key not in seen:
+                    seen.add(key)
+                    tags.append(value)
+        items.append(
+            {
+                **preset,
+                "id": str(preset["preset_id"]),
+                "label": str(preset["name"]),
+                "translation": str(preset.get("description") or ""),
+                "draw_prompt": str(preset.get("prompt") or ""),
+                "tags": tags,
+                "part": "全身",
+                "nsfw": str(preset.get("rating") or "普通") == "R18",
+            }
+        )
+    return items
+
+
 PRESET_KINDS: tuple[PresetKind, ...] = (
     PresetKind(
         kind="pose",
@@ -187,6 +215,23 @@ PRESET_KINDS: tuple[PresetKind, ...] = (
         scope_capable=False,
         max_per_scope=None,
         selection_type="single",
+        composition_enabled=False,
+    ),
+    PresetKind(
+        kind="outfit",
+        label="套装",
+        order=7,
+        catalog_key="outfits",
+        api_path="/api/prompt-agent/outfit-presets",
+        image_directory="outfit-presets",
+        image_extension="webp",
+        taxonomy_key="clothing",
+        composition_field="outfit_id",
+        list_loader=_outfit_presets,
+        scope_capable=False,
+        max_per_scope=None,
+        selection_type="single",
+        supports_colors=False,
         composition_enabled=False,
     ),
 )

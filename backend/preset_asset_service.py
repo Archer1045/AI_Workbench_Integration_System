@@ -219,9 +219,25 @@ def _candidate_preset_version(candidate: dict[str, Any]) -> int | None:
 
 
 def _assert_current_character_version(candidate: dict[str, Any]) -> None:
-    if str(candidate.get("preset_type") or "") != "character":
+    preset_type = str(candidate.get("preset_type") or "")
+    if preset_type not in {"character", "outfit"}:
         return
-    preset = resolve_preset("character", str(candidate.get("preset_id") or ""))
+    preset = resolve_preset(preset_type, str(candidate.get("preset_id") or ""))
+    if preset_type == "outfit":
+        params = candidate.get("params")
+        if not isinstance(params, dict):
+            params = {}
+        raw_hash = params.get("content_hash")
+        if candidate.get("generation_mode") == "crop":
+            nested = params.get("params")
+            if isinstance(nested, dict) and nested.get("content_hash") is not None:
+                raw_hash = nested.get("content_hash")
+        if not raw_hash or str(raw_hash) != str(preset.get("content_hash") or ""):
+            raise PresetAssetError(
+                "套装组合已变化，请基于当前 content hash 重新生成预览",
+                status_code=409,
+            )
+        return
     current_version = int(preset.get("version") or 1)
     if _candidate_preset_version(candidate) != current_version:
         raise PresetAssetError(

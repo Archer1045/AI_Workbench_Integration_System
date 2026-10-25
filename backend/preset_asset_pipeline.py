@@ -467,6 +467,8 @@ def _preset_thumbnail_text(preset: dict[str, Any]) -> str:
         str(preset.get("id") or ""),
         str(preset.get("label") or ""),
         str(preset.get("translation") or ""),
+        str(preset.get("draw_prompt") or ""),
+        str(preset.get("description") or ""),
         str(preset.get("category") or ""),
         str(preset.get("part") or ""),
         *(str(item) for item in (preset.get("tags") or [])),
@@ -506,7 +508,7 @@ def resolve_thumbnail_framing(
         return {"mode": "toy_character_context", "reason": "toy_character_context"}
     if preset_type == "expansion":
         return {"mode": "expansion_internal", "reason": "internal_depth_focus"}
-    if preset_type != "clothing":
+    if preset_type not in {"clothing", "outfit"}:
         return {"mode": "full_body", "reason": "person_reference"}
 
     text = _preset_thumbnail_text(preset)
@@ -637,7 +639,7 @@ def _thumbnail_prompt_constraints(
             "multiple toys, human body, hands covering the object, cropped object, clutter"
         ]
 
-    if preset_type == "clothing":
+    if preset_type in {"clothing", "outfit"}:
         scene = resolve_thumbnail_scene(preset)
         positive_parts.append(
             f"single clothing location appropriate for the outfit: {scene}"
@@ -712,7 +714,7 @@ def _thumbnail_validation_outcome(
     if expected_mode == "full_body" and not bool(data.get("feet_visible")):
         failures.append("full_body_required")
     if (
-        preset_type == "clothing"
+        preset_type in {"clothing", "outfit"}
         and expected_mode in {"upper_body", "partial_body"}
         and not bool(data.get("target_garment_visible"))
     ):
@@ -796,7 +798,10 @@ def _thumbnail_validation_outcome(
             failures.append("front_view_required")
     elif expected_mode != "expansion_internal" and not bool(data.get("front_facing")):
         failures.append("front_facing_required")
-    if preset_type == "clothing" and not bool(data.get("scene_matches")):
+    if (
+        preset_type in {"clothing", "outfit"}
+        and not bool(data.get("scene_matches"))
+    ):
         failures.append("clothing_scene_mismatch")
     return failures, warnings
 
@@ -820,7 +825,9 @@ def _validate_thumbnail_candidate(
     )
     expected_style = str((snapshot or {}).get("thumbnail_style") or "")
     expected_scene = (
-        resolve_thumbnail_scene(preset) if preset_type == "clothing" else ""
+        resolve_thumbnail_scene(preset)
+        if preset_type in {"clothing", "outfit"}
+        else ""
     )
     front_back_required = bool(
         (snapshot or {}).get("thumbnail_front_back")
@@ -988,6 +995,21 @@ _TYPE_TEMPLATES: dict[str, dict[str, str]] = {
         "negative": (
             "outfit collage, repeated character, obscured garment, missing garment parts, "
             f"wardrobe grid, unrelated clothing, extra layered outfit, "
+            f"{_FULL_BODY_FRAMING_NEGATIVE}, {_VISIBLE_FACE_NEGATIVE}"
+        ),
+    },
+    "outfit": {
+        "positive": (
+            f"single complete outfit reference, full-body fashion presentation, "
+            f"{_FULL_BODY_FRAMING_POSITIVE}, {_VISIBLE_FACE_POSITIVE}, "
+            "all listed garments visible together, exact layer order, "
+            "clear materials, clear overlaps, focused outfit presentation, "
+            "the composited outfit replaces any base outfit, no unrelated garments"
+        ),
+        "negative": (
+            "outfit collage, repeated character, obscured garment, missing garment parts, "
+            f"wardrobe grid, unrelated clothing, extra layered outfit, "
+            "wrong layer order, merged garments, "
             f"{_FULL_BODY_FRAMING_NEGATIVE}, {_VISIBLE_FACE_NEGATIVE}"
         ),
     },
@@ -1267,6 +1289,9 @@ def build_prompt_snapshot(
     )
     core_prompt = str(preset.get("draw_prompt") or "")
     generation_prompt = _strip_multi_subject_text(core_prompt)
+    if preset_type == "outfit":
+        # The outfit prompt already contains every ordered garment once.
+        core_tags = ""
     if preset_type == "expansion":
         generation_prompt = "adult woman in a fictional visual expansion state"
         core_tags = _strip_prompt_fragments(
@@ -1393,6 +1418,9 @@ def build_prompt_snapshot(
     }
     if preset_type == "character":
         snapshot["preset_version"] = int(preset.get("version") or 1)
+    if preset_type == "outfit":
+        snapshot["preset_version"] = int(preset.get("version") or 1)
+        snapshot["content_hash"] = str(preset.get("content_hash") or "")
     return snapshot
 
 
@@ -1471,6 +1499,10 @@ def _normalize_create_items(
             crop_params = dict(raw_item.get("params") or {})
             if preset_type == "character":
                 crop_params["preset_version"] = int(preset.get("version") or 1)
+            if preset_type == "outfit":
+                crop_params["content_hash"] = str(
+                    preset.get("content_hash") or ""
+                )
             params = {
                 "source_id": int(source_id),
                 "crop": dict(raw_item.get("crop") or {}),

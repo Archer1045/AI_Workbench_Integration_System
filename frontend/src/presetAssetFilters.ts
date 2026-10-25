@@ -56,7 +56,10 @@ const PRESET_ASSET_KINDS = new Set<PresetAssetKind>([
   'clothing',
   'scene',
   'body',
+  'expansion',
+  'toy',
   'character',
+  'outfit',
 ]);
 
 const RESOURCE_FILTERS = new Set<PresetAssetResourceFilter>([

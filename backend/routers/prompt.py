@@ -21,6 +21,7 @@ import body_modification_presets
 import expression_presets
 import expansion_presets
 import llm
+import outfit_sets
 import preset_asset_service
 import preset_composer
 import preset_registry
@@ -559,6 +560,29 @@ def _expression_items(restriction: bool) -> list[dict]:
     ]
 
 
+def _outfit_items(restriction: bool) -> list[dict]:
+    items: list[dict] = []
+    for preset in database.list_outfit_presets(restricted=restriction):
+        image = _preset_image_url(
+            preset,
+            "outfit-presets",
+            "webp",
+        )
+        items.append(
+            {
+                **preset,
+                "label": preset["name"],
+                "translation": preset["description"],
+                "draw_prompt": preset["prompt"],
+                "part": "全身",
+                "nsfw": preset["rating"] == "R18",
+                "has_image": bool(image),
+                "image": image,
+            }
+        )
+    return items
+
+
 def _water_items(restriction: bool) -> list[dict]:
     return [
         {
@@ -994,6 +1018,148 @@ def preset_catalog() -> dict:
         "expansions": _expansion_items(restriction),
         "toys": _toy_items(restriction),
     }
+
+
+def _normalize_outfit_or_http(payload: dict) -> dict:
+    try:
+        return outfit_sets.normalize_outfit_payload(
+            payload,
+            restriction_enabled=content_restriction_enabled(),
+        )
+    except outfit_sets.OutfitSetError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+
+@router.get("/api/prompt-agent/outfit-presets")
+def outfit_presets_api(
+    keyword: str = Query(""),
+    category: str = Query(""),
+    source: str = Query(""),
+) -> dict:
+    """Return saved outfit sets and the metadata needed by the editor."""
+    restriction = content_restriction_enabled()
+    items = _outfit_items(restriction)
+    if keyword.strip():
+        query = keyword.strip().casefold()
+        items = [
+            item
+            for item in items
+            if query
+            in " ".join(
+                [
+                    str(item.get("name") or ""),
+                    str(item.get("description") or ""),
+                    str(item.get("category") or ""),
+                    str(item.get("preset_id") or ""),
+                ]
+            ).casefold()
+        ]
+    if category.strip():
+        items = [item for item in items if item.get("category") == category]
+    if source.strip():
+        items = [item for item in items if item.get("source") == source]
+    categories = sorted(
+        {
+            str(item.get("category") or "")
+            for item in database.list_outfit_presets(restricted=restriction)
+            if str(item.get("category") or "").strip()
+        }
+    )
+    return {
+        "items": items,
+        "total": len(items),
+        "categories": categories,
+        "slots": [
+            {"value": slot, "label": outfit_sets.SLOT_LABELS[slot]}
+            for slot in outfit_sets.SLOTS
+        ],
+        "max_items": outfit_sets.MAX_ITEMS,
+        "restricted": restriction,
+        "schema_version": outfit_sets.SCHEMA_VERSION,
+    }
+
+
+@router.post("/api/prompt-agent/outfit-presets/compose")
+def compose_outfit_set(payload: dict = Body(...)) -> dict:
+    """Validate an unsaved outfit and render its final prompt."""
+    return _normalize_outfit_or_http(payload)
+
+
+@router.post("/api/prompt-agent/outfit-presets")
+def create_outfit_preset_api(payload: dict = Body(...)) -> dict:
+    """Persist a user-created outfit with immutable item snapshots."""
+    normalized = _normalize_outfit_or_http(payload)
+    try:
+        item = database.create_outfit_preset(normalized)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"item": item}
+
+
+@router.get("/api/prompt-agent/outfit-presets/{preset_id}")
+def outfit_preset_detail(
+    preset_id: str,
+    version: int | None = Query(None, ge=1),
+) -> dict:
+    item = database.get_outfit_preset(preset_id, version)
+    if not item:
+        raise HTTPException(status_code=404, detail="套装不存在")
+    if content_restriction_enabled() and item.get("rating") == "R18":
+        raise HTTPException(status_code=404, detail="套装不存在")
+    return {"item": item}
+
+
+@router.post("/api/prompt-agent/outfit-presets/{preset_id}/duplicate")
+def duplicate_outfit_preset(
+    preset_id: str,
+    payload: dict = Body(default={}),
+) -> dict:
+    current = database.get_outfit_preset(preset_id)
+    if not current:
+        raise HTTPException(status_code=404, detail="套装不存在")
+    normalized = _normalize_outfit_or_http(
+        {
+            **current,
+            "name": str(payload.get("name") or f"{current['name']} 副本"),
+            "description": payload.get("description", current["description"]),
+            "category": payload.get("category", current["category"]),
+            "items": current["items"],
+        }
+    )
+    try:
+        item = database.create_outfit_preset(normalized)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"item": item}
+
+
+@router.put("/api/prompt-agent/outfit-presets/{preset_id}")
+def update_outfit_preset_api(
+    preset_id: str,
+    payload: dict = Body(...),
+) -> dict:
+    current = database.get_outfit_preset(preset_id)
+    if not current:
+        raise HTTPException(status_code=404, detail="套装不存在")
+    if current["source"] != "user":
+        raise HTTPException(status_code=409, detail="内置套装只能另存为副本")
+    normalized = _normalize_outfit_or_http(payload)
+    try:
+        item = database.update_outfit_preset(preset_id, normalized)
+    except PermissionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"item": item}
+
+
+@router.delete("/api/prompt-agent/outfit-presets/{preset_id}")
+def delete_outfit_preset_api(preset_id: str) -> dict:
+    try:
+        deleted = database.delete_outfit_preset(preset_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="套装不存在")
+    return {"ok": True, "deleted": deleted}
 
 
 @router.post("/api/prompt-agent/compose-presets")
