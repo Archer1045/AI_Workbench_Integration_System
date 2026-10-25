@@ -72,6 +72,7 @@ import {
   applyExpressionPresetToCharacter,
   clonePromptDocument,
   createEmptyStructuredDocument,
+  createPromptBlock,
   createPromptCharacter,
   BODY_BUILD_OPTIONS,
   HEIGHT_FRAME_OPTIONS,
@@ -79,12 +80,15 @@ import {
   mergeTags,
   moveCharacter,
   normalizePromptDocument,
+  promptBlockDetailTags,
   removeCharacter,
   resolveCharacterTargets,
   updateCharacter,
   updateCharacterBlock,
+  updateCharacterPropsBlock,
   updateCustom,
   updateGlobalBlock,
+  updateGlobalPropsBlock,
   updateInteraction,
   updateNegativeBlock,
   updateRawOverride,
@@ -149,6 +153,89 @@ const CHARACTER_BLOCK_LABELS: Record<
   pose_or_action: '角色动作',
   expression: '表情',
   state: '状态',
+};
+const BLOCK_DETAIL_FIELDS: Record<
+  string,
+  Array<{
+    field:
+      | 'gaze'
+      | 'face_details'
+      | 'clothing_state'
+      | 'framing'
+      | 'angle'
+      | 'focus'
+      | 'time'
+      | 'weather'
+      | 'foreground'
+      | 'background'
+      | 'palette'
+      | 'mood';
+    label: string;
+    placeholder: string;
+  }>
+> = {
+  expression: [
+    {
+      field: 'gaze',
+      label: '视线',
+      placeholder: 'looking at viewer, looking away',
+    },
+    {
+      field: 'face_details',
+      label: '面部细节',
+      placeholder: 'light blush, teary eyes',
+    },
+  ],
+  clothing: [
+    {
+      field: 'clothing_state',
+      label: '穿着状态',
+      placeholder: 'wet, partially unbuttoned, torn',
+    },
+  ],
+  camera: [
+    {
+      field: 'framing',
+      label: '景别',
+      placeholder: 'full body, upper body, close-up',
+    },
+    {
+      field: 'angle',
+      label: '角度',
+      placeholder: 'from above, from below, eye level',
+    },
+    {
+      field: 'focus',
+      label: '焦点',
+      placeholder: 'sharp focus, shallow depth of field',
+    },
+  ],
+  scene: [
+    { field: 'time', label: '时间', placeholder: 'morning, sunset, night' },
+    { field: 'weather', label: '天气', placeholder: 'rain, snow, fog' },
+    {
+      field: 'foreground',
+      label: '前景',
+      placeholder: 'flowers in foreground',
+    },
+    {
+      field: 'background',
+      label: '背景',
+      placeholder: 'distant mountains, city lights',
+    },
+  ],
+  lighting: [
+    {
+      field: 'palette',
+      label: '色调',
+      placeholder: 'warm, cool, pastel, monochrome',
+    },
+    {
+      field: 'mood',
+      label: '氛围',
+      placeholder: 'soft, dramatic, cozy',
+    },
+  ],
 };
 const DRAW_RESULT_FAVORITES_KEY = 'rider-studio:draw-result-favorites-v1';
 
@@ -222,6 +309,8 @@ function PromptBlockEditor({
   onChange: (block: PromptBlock) => void;
   rows?: number;
 }) {
+  const detailFields = BLOCK_DETAIL_FIELDS[block.kind || ''] || [];
+  const footwear = block.footwear || createPromptBlock('footwear');
   return (
     <div className="setting-field" style={{ minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -237,10 +326,77 @@ function PromptBlockEditor({
       </div>
       <Input.TextArea
         rows={rows}
+        aria-label={label}
         value={block.tags.join(', ')}
         disabled={block.enabled === false}
         onChange={(event) => onChange({ ...block, tags: tagsOf(event.target.value) })}
       />
+      {detailFields.length > 0 ? (
+        <div className="setting-field-stack" style={{ marginTop: 8 }}>
+          {detailFields.map((field) => (
+            <label className="compact-field" key={field.field}>
+              <span>{field.label}</span>
+              <Input
+                size="small"
+                aria-label={`${label}${field.label}`}
+                value={(block[field.field] || []).join(', ')}
+                placeholder={field.placeholder}
+                disabled={block.enabled === false}
+                onChange={(event) =>
+                  onChange({
+                    ...block,
+                    [field.field]: tagsOf(event.target.value),
+                  })
+                }
+              />
+            </label>
+          ))}
+        </div>
+      ) : null}
+      {block.kind === 'clothing' ? (
+        <label className="compact-field" style={{ marginTop: 8 }}>
+          <span>鞋履</span>
+          <Input
+            size="small"
+            aria-label={`${label}鞋履`}
+            value={footwear.tags.join(', ')}
+            placeholder="black high heels, knee-high boots"
+            disabled={block.enabled === false}
+            onChange={(event) =>
+              onChange({
+                ...block,
+                footwear: {
+                  ...footwear,
+                  tags: tagsOf(event.target.value),
+                },
+              })
+            }
+          />
+        </label>
+      ) : null}
+      {block.kind === 'expression' ? (
+        <label className="compact-field" style={{ marginTop: 8 }}>
+          <span>强度</span>
+          <InputNumber
+            size="small"
+            aria-label={`${label}强度`}
+            min={0}
+            max={1}
+            step={0.05}
+            value={block.intensity ?? 0.7}
+            disabled={block.enabled === false}
+            onChange={(value) =>
+              onChange({
+                ...block,
+                intensity:
+                  typeof value === 'number'
+                    ? Math.min(1, Math.max(0, value))
+                    : 0.7,
+              })
+            }
+          />
+        </label>
+      ) : null}
     </div>
   );
 }
@@ -838,6 +994,7 @@ export default function DrawPanel({
   };
 
   const insertClothingPreset = (preset: ClothingPreset, scope: ClothingScope) => {
+    const isFootwear = preset.category === '鞋' || preset.part === '鞋';
     const target =
       drawStore.groups.find((group) => group.id === activeGroupId) || drawStore.groups[0];
     if (!target) {
@@ -872,21 +1029,40 @@ export default function DrawPanel({
       return;
     }
     if (resolvedTarget.mode === 'structured') {
-      const additions = mergeTags(
-        preset.tags,
-        preset.draw_prompt ? tagsOf(preset.draw_prompt) : [],
-      );
+      const additions = mergeTags(preset.tags, preset.draw_prompt ? tagsOf(preset.draw_prompt) : []);
       updateDocument(resolvedTarget.id, (document) => {
         const targetIds = resolveCharacterTargets(document, activeCharacterId, scope);
         return targetIds.reduce(
           (next, characterId) =>
             updateCharacterBlock(next, characterId, 'clothing', (block) =>
-              addPresetRefToBlock(
-                { ...block, tags: mergeTags(block.tags, additions), source: 'clothing_preset' },
-                preset.id,
-                1,
-                scope,
-              ),
+              isFootwear
+                ? {
+                    ...block,
+                    footwear: addPresetRefToBlock(
+                      {
+                        ...(block.footwear || createPromptBlock('footwear')),
+                        tags: mergeTags(
+                          block.footwear?.tags || [],
+                          additions,
+                        ),
+                        source: 'clothing_preset',
+                        preset_snapshot: {
+                          name: preset.label,
+                          category: preset.category,
+                          footwear_type: preset.footwear_type || '',
+                        },
+                      },
+                      preset.id,
+                      1,
+                      scope,
+                    ),
+                  }
+                : addPresetRefToBlock(
+                    { ...block, tags: mergeTags(block.tags, additions), source: 'clothing_preset' },
+                    preset.id,
+                    1,
+                    scope,
+                  ),
             ),
           document,
         );
@@ -907,7 +1083,9 @@ export default function DrawPanel({
     if (conflict) {
       message.warning(`已插入「${preset.label}」，但提示词含裸露标签，可能互相冲突`);
     } else {
-      message.success(`已把「${preset.label}」写入目标角色服装块`);
+      message.success(
+        `已把「${preset.label}」写入目标角色${isFootwear ? '鞋履' : '服装'}块`,
+      );
     }
   };
 
@@ -1754,17 +1932,26 @@ export default function DrawPanel({
             character.expression,
             character.state,
           ] as PromptBlock[]
-        ).reduce((count, block) => count + block.tags.length, 0),
+        ).reduce(
+          (count, block) => count + promptBlockDetailTags(block).length,
+          0,
+        ) +
+        promptBlockDetailTags(
+          document.props.characters[character.role_id] ||
+            createPromptBlock('props'),
+        ).length,
       0,
     );
     const globalTagCount =
       Object.values(document.global).reduce(
-        (total, block) => total + block.tags.length,
+        (total, block) => total + promptBlockDetailTags(block).length,
         0,
       ) +
+      promptBlockDetailTags(document.props.global).length +
       document.interaction.action_tags.length +
       document.interaction.contact_tags.length +
-      document.interaction.relationship_tags.length;
+      document.interaction.relationship_tags.length +
+      document.interaction.composition_constraints.length;
     const previewExcerpt = (preview?.prompt || '').trim();
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
@@ -1975,6 +2162,23 @@ export default function DrawPanel({
                 />
               ))}
             </div>
+            <PromptBlockEditor
+              label="角色道具"
+              block={
+                document.props.characters[activeCharacter.role_id] ||
+                createPromptBlock('props')
+              }
+              onChange={(block) =>
+                updateGroupDocument(
+                  group.id,
+                  updateCharacterPropsBlock(
+                    document,
+                    activeCharacter.role_id,
+                    () => block,
+                  ),
+                )
+              }
+            />
           </>
         ) : null}
         <Collapse
@@ -2004,6 +2208,16 @@ export default function DrawPanel({
                       />
                     ),
                   )}
+                  <PromptBlockEditor
+                    label="场景道具"
+                    block={document.props.global}
+                    onChange={(block) =>
+                      updateGroupDocument(
+                        group.id,
+                        updateGlobalPropsBlock(document, () => block),
+                      )
+                    }
+                  />
                 </div>
               ),
             },

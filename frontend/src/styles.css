@@ -735,6 +735,30 @@ body,
   min-width: 0;
 }
 
+.setting-field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compact-field {
+  display: grid;
+  grid-template-columns: minmax(64px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.compact-field > span {
+  white-space: nowrap;
+}
+
+.compact-field .ant-input-number {
+  width: 100%;
+}
+
 .setting-wide {
   grid-column: 1 / -1;
 }

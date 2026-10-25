@@ -20,6 +20,17 @@ def test_expression_catalog_is_complete_and_unambiguous():
     assert {
         item["intensity"] for item in items
     } <= set(expression_presets.INTENSITIES)
+    assert all(
+        isinstance(item["intensity_value"], float)
+        and 0 <= item["intensity_value"] <= 1
+        for item in items
+    )
+    assert all(isinstance(item["expression_tags"], list) for item in items)
+    assert all(isinstance(item["gaze"], list) for item in items)
+    assert all(isinstance(item["face_details"], list) for item in items)
+    shy = next(item for item in items if item["id"] == "expression_shy_blush")
+    assert "looking away" in shy["gaze"]
+    assert "blush" in shy["face_details"]
 
 
 def test_expression_api_filters_category_intensity_and_keyword(client):
@@ -73,4 +84,5 @@ def test_prompt_document_resolves_builtin_expression_reference():
 
     assert resolved["blocked"] is False
     assert "for the first girl (Hero): soft smile" in resolved["prompt"]
+    assert "for the first girl (Hero): warm expression" in resolved["prompt"]
     assert "expression_soft_smile" in resolved["used_ids"]

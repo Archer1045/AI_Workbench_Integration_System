@@ -7,6 +7,38 @@ SCHEMA_VERSION = 1
 CATEGORIES = ("基础情绪", "强烈情绪", "社交表达")
 INTENSITIES = ("轻", "中", "强")
 CHARACTER_SCOPES = ("通用",)
+INTENSITY_VALUES = {"轻": 0.4, "中": 0.7, "强": 1.0}
+GAZE_MARKERS = ("gaze", "looking at", "looking away", "glance", "eye contact")
+FACE_DETAIL_MARKERS = (
+    "blush",
+    "tears",
+    "teary",
+    "sweat",
+    "pale face",
+    "wrinkled nose",
+    "furrowed brows",
+    "raised eyebrows",
+    "open mouth",
+    "flat mouth",
+    "trembling lips",
+    "quivering lips",
+    "pouting",
+)
+
+
+def _expression_parts(tags: tuple[str, ...]) -> tuple[list[str], list[str], list[str]]:
+    gaze: list[str] = []
+    face_details: list[str] = []
+    expression_tags: list[str] = []
+    for tag in tags:
+        lowered = tag.lower()
+        if any(marker in lowered for marker in GAZE_MARKERS):
+            gaze.append(tag)
+        elif any(marker in lowered for marker in FACE_DETAIL_MARKERS):
+            face_details.append(tag)
+        else:
+            expression_tags.append(tag)
+    return expression_tags, gaze, face_details
 
 
 def _preset(
@@ -18,6 +50,7 @@ def _preset(
     intensity: str,
     aliases: tuple[str, ...] = (),
 ) -> dict[str, Any]:
+    expression_tags, gaze, face_details = _expression_parts(tags)
     return {
         "schema_version": SCHEMA_VERSION,
         "id": f"expression_{preset_id}",
@@ -25,7 +58,11 @@ def _preset(
         "label": label,
         "translation": translation,
         "tags": list(tags),
+        "expression_tags": expression_tags,
+        "gaze": gaze,
+        "face_details": face_details,
         "intensity": intensity,
+        "intensity_value": INTENSITY_VALUES[intensity],
         "character_scope": list(CHARACTER_SCOPES),
         "rating": "普通",
         "nsfw": False,

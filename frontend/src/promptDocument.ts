@@ -43,6 +43,12 @@ const DEFAULT_ROLE_LABELS: Record<string, string> = {
   boyB: '男B',
 };
 
+const EXPRESSION_INTENSITY_VALUES: Record<string, number> = {
+  轻: 0.4,
+  中: 0.7,
+  强: 1,
+};
+
 export const HEIGHT_FRAME_OPTIONS: ReadonlyArray<{
   value: PromptHeightFrame;
   label: string;
@@ -67,6 +73,18 @@ export const BODY_BUILD_OPTIONS: ReadonlyArray<{
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+function normalizeIntensity(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0.7;
+  return Math.min(1, Math.max(0, numeric));
 }
 
 function normalizeProfileValue<T extends string>(
@@ -97,8 +115,55 @@ export function isBodyProfileEmpty(profile: PromptBodyProfile | null | undefined
   return normalized.height_frame === 'none' && normalized.body_build === 'none';
 }
 
+function applyBlockExtensions(
+  block: PromptBlock,
+  kind: string,
+  data: Partial<PromptBlock> = {},
+): PromptBlock {
+  if (kind === 'expression') {
+    return {
+      ...block,
+      gaze: normalizeStringArray(data.gaze),
+      face_details: normalizeStringArray(data.face_details),
+      intensity: normalizeIntensity(data.intensity),
+    };
+  }
+  if (kind === 'clothing') {
+    return {
+      ...block,
+      clothing_state: normalizeStringArray(data.clothing_state),
+      footwear: normalizeBlock(data.footwear, 'footwear'),
+    };
+  }
+  if (kind === 'camera') {
+    return {
+      ...block,
+      framing: normalizeStringArray(data.framing),
+      angle: normalizeStringArray(data.angle),
+      focus: normalizeStringArray(data.focus),
+    };
+  }
+  if (kind === 'scene') {
+    return {
+      ...block,
+      time: normalizeStringArray(data.time),
+      weather: normalizeStringArray(data.weather),
+      foreground: normalizeStringArray(data.foreground),
+      background: normalizeStringArray(data.background),
+    };
+  }
+  if (kind === 'lighting') {
+    return {
+      ...block,
+      palette: normalizeStringArray(data.palette),
+      mood: normalizeStringArray(data.mood),
+    };
+  }
+  return block;
+}
+
 export function createPromptBlock(kind: string, tags: string[] = [], presetRefs: PromptPresetRef[] = []): PromptBlock {
-  return {
+  return applyBlockExtensions({
     id: `${kind}-block`,
     kind,
     tags: [...tags],
@@ -108,13 +173,13 @@ export function createPromptBlock(kind: string, tags: string[] = [], presetRefs:
     enabled: true,
     source: 'manual',
     order: 0,
-  };
+  }, kind);
 }
 
 function normalizeBlock(raw: unknown, kind: string): PromptBlock {
   const data = raw && typeof raw === 'object' ? (raw as Partial<PromptBlock>) : {};
   const refs: unknown[] = Array.isArray(data.preset_refs) ? data.preset_refs : [];
-  return {
+  return applyBlockExtensions({
     id: typeof data.id === 'string' && data.id ? data.id : `${kind}-block`,
     kind: typeof data.kind === 'string' && data.kind ? data.kind : kind,
     tags: Array.isArray(data.tags) ? data.tags.filter((tag): tag is string => typeof tag === 'string') : [],
@@ -134,6 +199,25 @@ function normalizeBlock(raw: unknown, kind: string): PromptBlock {
     enabled: data.enabled !== false,
     source: typeof data.source === 'string' && data.source ? data.source : 'manual',
     order: Number(data.order || 0),
+  }, kind, data);
+}
+
+function normalizeProps(raw: unknown): PromptDocumentV1['props'] {
+  const data = raw && typeof raw === 'object'
+    ? (raw as Partial<PromptDocumentV1['props']>)
+    : {};
+  const charactersRaw =
+    data.characters && typeof data.characters === 'object'
+      ? data.characters
+      : {};
+  return {
+    global: normalizeBlock(data.global, 'props'),
+    characters: Object.fromEntries(
+      Object.entries(charactersRaw).map(([roleId, block]) => [
+        roleId,
+        normalizeBlock(block, 'props'),
+      ]),
+    ),
   };
 }
 
@@ -185,6 +269,10 @@ function createBaseDocument(mode: 'structured' | 'legacy'): PromptDocumentV1 {
       constraints: createPromptBlock('constraints'),
     },
     characters: [createPromptCharacter(0)],
+    props: {
+      global: createPromptBlock('props'),
+      characters: {},
+    },
     interaction: {
       action_tags: [],
       contact_tags: [],
@@ -243,6 +331,7 @@ export function normalizePromptDocument(raw: unknown): PromptDocumentV1 {
     data.interaction && typeof data.interaction === 'object' ? data.interaction : {};
   const customRaw: Partial<PromptDocumentV1['custom']> =
     data.custom && typeof data.custom === 'object' ? data.custom : {};
+  const propsRaw = normalizeProps(data.props);
   const rawOverride: Partial<PromptDocumentV1['raw_override']> =
     data.raw_override && typeof data.raw_override === 'object' ? data.raw_override : {};
   const charactersRaw = Array.isArray(data.characters) ? data.characters : [];
@@ -262,6 +351,7 @@ export function normalizePromptDocument(raw: unknown): PromptDocumentV1 {
       constraints: normalizeBlock(globalRaw.constraints, 'constraints'),
     },
     characters: characters.map((character, index) => ({ ...character, order: index })),
+    props: propsRaw,
     interaction: {
       ...(interactionRaw.pose_preset?.preset_id
         ? { pose_preset: interactionRaw.pose_preset }
@@ -304,18 +394,50 @@ export function clonePromptDocument(document: PromptDocumentV1): PromptDocumentV
   return normalizePromptDocument(clone(document));
 }
 
-export function mergeTags(existing: string[], additions: string[]): string[] {
+export function mergeTags(...groups: string[][]): string[] {
   const result: string[] = [];
   const seen = new Set<string>();
-  for (const item of [...existing, ...additions]) {
-    const tag = String(item || '').trim();
-    const key = tag.toLowerCase();
-    if (tag && !seen.has(key)) {
-      seen.add(key);
-      result.push(tag);
+  for (const group of groups) {
+    for (const item of group || []) {
+      const tag = String(item || '').trim();
+      const key = tag.toLowerCase();
+      if (tag && !seen.has(key)) {
+        seen.add(key);
+        result.push(tag);
+      }
     }
   }
   return result;
+}
+
+export function promptBlockDetailTags(block: PromptBlock): string[] {
+  const detailFields =
+    block.kind === 'expression'
+      ? [block.gaze, block.face_details]
+      : block.kind === 'clothing'
+        ? [
+            block.footwear ? promptBlockDetailTags(block.footwear) : [],
+            block.clothing_state,
+          ]
+        : block.kind === 'camera'
+          ? [block.framing, block.angle, block.focus]
+          : block.kind === 'scene'
+            ? [block.time, block.weather, block.foreground, block.background]
+            : block.kind === 'lighting'
+              ? [block.palette, block.mood]
+              : [];
+  return mergeTags(
+    block.tags,
+    ...detailFields.filter((field): field is string[] => Array.isArray(field)),
+  );
+}
+
+function hasPromptBlockContent(block: PromptBlock): boolean {
+  return (
+    block.tags.length > 0 ||
+    block.preset_refs.length > 0 ||
+    promptBlockDetailTags(block).length > block.tags.length
+  );
 }
 
 export function isPromptDocumentEmpty(document: PromptDocumentV1 | null | undefined): boolean {
@@ -323,9 +445,11 @@ export function isPromptDocumentEmpty(document: PromptDocumentV1 | null | undefi
   const normalized = normalizePromptDocument(document);
   if (normalized.raw_override.prompt.trim()) return false;
   if (normalized.interaction.pose_preset?.preset_id) return false;
-  const hasBlock = (block: PromptBlock) => block.tags.length > 0 || block.preset_refs.length > 0;
+  const hasBlock = (block: PromptBlock) => hasPromptBlockContent(block);
   if (Object.values(normalized.global).some(hasBlock)) return false;
   if (Object.values(normalized.negative).some(hasBlock)) return false;
+  if (hasBlock(normalized.props.global)) return false;
+  if (Object.values(normalized.props.characters).some(hasBlock)) return false;
   if (normalized.characters.some((character) => CHARACTER_BLOCK_KINDS.some((kind) => hasBlock(character[kind])))) return false;
   if (
     normalized.characters.some(
@@ -374,14 +498,40 @@ export function addPresetRefToBlock(
 export function applyExpressionPresetToCharacter(
   document: PromptDocumentV1,
   characterId: string,
-  preset: Pick<ExpressionPreset, 'id' | 'label' | 'category' | 'tags'>,
+  preset: Pick<ExpressionPreset, 'id' | 'label' | 'category' | 'tags'> &
+    Partial<
+      Pick<
+        ExpressionPreset,
+        | 'expression_tags'
+        | 'gaze'
+        | 'face_details'
+        | 'intensity'
+        | 'intensity_value'
+      >
+    >,
   scope?: PresetScope,
 ): PromptDocumentV1 {
+  const expressionTags =
+    preset.expression_tags && preset.expression_tags.length
+      ? preset.expression_tags
+      : preset.tags;
   return updateCharacterBlock(document, characterId, 'expression', (block) => ({
     ...addPresetRefToBlock(
       {
         ...block,
-        tags: mergeTags(block.tags, preset.tags),
+        tags: mergeTags(block.tags, expressionTags),
+        gaze: mergeTags(block.gaze || [], preset.gaze || []),
+        face_details: mergeTags(
+          block.face_details || [],
+          preset.face_details || [],
+        ),
+        intensity: normalizeIntensity(
+          preset.intensity_value ??
+            (preset.intensity
+              ? EXPRESSION_INTENSITY_VALUES[preset.intensity]
+              : undefined) ??
+            block.intensity,
+        ),
         source: 'expression_preset',
       },
       preset.id,
@@ -391,7 +541,15 @@ export function applyExpressionPresetToCharacter(
     preset_snapshot: {
       name: preset.label,
       category: preset.category,
-      expression_tags: [...preset.tags],
+      expression_tags: [...expressionTags],
+      gaze: [...(preset.gaze || [])],
+      face_details: [...(preset.face_details || [])],
+      intensity:
+        preset.intensity_value ??
+        (preset.intensity
+          ? EXPRESSION_INTENSITY_VALUES[preset.intensity]
+          : undefined) ??
+        0.7,
     },
   }));
 }
@@ -416,6 +574,29 @@ export function updateGlobalBlock(
 ): PromptDocumentV1 {
   const next = clonePromptDocument(document);
   next.global[kind] = update(next.global[kind]);
+  return next;
+}
+
+export function updateGlobalPropsBlock(
+  document: PromptDocumentV1,
+  update: (block: PromptBlock) => PromptBlock,
+): PromptDocumentV1 {
+  const next = clonePromptDocument(document);
+  next.props.global = update(next.props.global);
+  return next;
+}
+
+export function updateCharacterPropsBlock(
+  document: PromptDocumentV1,
+  roleId: string,
+  update: (block: PromptBlock) => PromptBlock,
+): PromptDocumentV1 {
+  const next = clonePromptDocument(document);
+  const block = next.props.characters[roleId] || createPromptBlock('props');
+  next.props.characters = {
+    ...next.props.characters,
+    [roleId]: update(block),
+  };
   return next;
 }
 

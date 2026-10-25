@@ -1,6 +1,7 @@
 import { AimOutlined } from '@ant-design/icons';
 import { Button, Collapse, Drawer, Empty, Space, Tag } from 'antd';
 import type { PromptBlock, PromptDocumentV1 } from '../api';
+import { createPromptBlock, promptBlockDetailTags } from '../promptDocument';
 import type { DrawGroup } from '../stores/draw';
 
 interface StructuredPreviewLike {
@@ -48,6 +49,7 @@ function BlockOutline({
   label: string;
   block: PromptBlock;
 }) {
+  const detailTags = promptBlockDetailTags(block);
   return (
     <div className="draw-outline-block">
       <div className="draw-outline-block-title">
@@ -63,13 +65,16 @@ function BlockOutline({
         </Space>
       </div>
       <div className="draw-outline-tags">
-        {block.tags.length === 0 ? (
+        {detailTags.length === 0 ? (
           <span className="help">空</span>
         ) : (
-          block.tags.map((tag, index) => (
+          detailTags.map((tag, index) => (
             <Tag key={`${tag}-${index}`}>{tag}</Tag>
           ))
         )}
+        {block.kind === 'expression' ? (
+          <Tag color="gold">强度 {block.intensity ?? 0.7}</Tag>
+        ) : null}
       </div>
     </div>
   );
@@ -99,6 +104,13 @@ function StructuredOutline({
                 block={character[key]}
               />
             ))}
+            <BlockOutline
+              label="角色道具"
+              block={
+                document.props.characters[character.role_id] ||
+                createPromptBlock('props')
+              }
+            />
           </div>
         </section>
       ))}
@@ -117,6 +129,7 @@ function StructuredOutline({
               />
             ),
           )}
+          <BlockOutline label="场景道具" block={document.props.global} />
         </div>
       </section>
 

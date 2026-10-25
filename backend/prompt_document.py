@@ -110,6 +110,7 @@ APPEARANCE_CATEGORIES = (
 )
 _REFERENCE_KINDS = {
     "clothing": "clothing",
+    "footwear": "clothing",
     "body_modifications": "body",
     "scene": "scene",
     "toys": "toy",
@@ -151,6 +152,14 @@ def _merge_tags(*groups: Iterable[str]) -> list[str]:
     return result
 
 
+def _intensity(value: object) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 0.7
+    return round(min(1.0, max(0.0, numeric)), 2)
+
+
 def _block(raw: object, kind: str) -> dict:
     if isinstance(raw, list) or isinstance(raw, str):
         data: dict = {"tags": raw}
@@ -177,7 +186,7 @@ def _block(raw: object, kind: str) -> dict:
                     ref["scope"] = prompt_composer_scope(item.get("scope"))
             refs.append(ref)
     snapshot = data.get("preset_snapshot")
-    return {
+    result = {
         "id": _text(data.get("id")) or f"{kind}-block",
         "kind": kind,
         "tags": _tags(data.get("tags")),
@@ -187,6 +196,50 @@ def _block(raw: object, kind: str) -> dict:
         "enabled": data.get("enabled", True) is not False,
         "source": _text(data.get("source")) or "manual",
         "order": int(data.get("order") or 0),
+    }
+    if kind == "expression":
+        result.update(
+            gaze=_tags(data.get("gaze")),
+            face_details=_tags(data.get("face_details")),
+            intensity=_intensity(data.get("intensity")),
+        )
+    elif kind == "clothing":
+        result.update(
+            clothing_state=_tags(data.get("clothing_state")),
+            footwear=_block(data.get("footwear"), "footwear"),
+        )
+    elif kind == "camera":
+        result.update(
+            framing=_tags(data.get("framing")),
+            angle=_tags(data.get("angle")),
+            focus=_tags(data.get("focus")),
+        )
+    elif kind == "scene":
+        result.update(
+            time=_tags(data.get("time")),
+            weather=_tags(data.get("weather")),
+            foreground=_tags(data.get("foreground")),
+            background=_tags(data.get("background")),
+        )
+    elif kind == "lighting":
+        result.update(
+            palette=_tags(data.get("palette")),
+            mood=_tags(data.get("mood")),
+        )
+    return result
+
+
+def _props(raw: object) -> dict:
+    data = raw if isinstance(raw, dict) else {}
+    raw_characters = data.get("characters")
+    characters = raw_characters if isinstance(raw_characters, dict) else {}
+    return {
+        "global": _block(data.get("global"), "props"),
+        "characters": {
+            _text(role_id): _block(block, "props")
+            for role_id, block in characters.items()
+            if _text(role_id)
+        },
     }
 
 
@@ -283,6 +336,7 @@ def normalize_document(raw: object) -> dict:
         "mode": mode,
         "global": {kind: _block(global_raw.get(kind), kind) for kind in GLOBAL_BLOCKS},
         "characters": characters,
+        "props": _props(data.get("props")),
         "interaction": {
             "pose_preset": pose_ref,
             "action_tags": _tags(interaction_raw.get("action_tags")),
@@ -382,26 +436,73 @@ def _block_tags(
     tags = list(block.get("tags") or [])
     used_ids: list[str] = []
     rating = "普通"
+    block_kind = _text(block.get("kind"))
+    if block_kind == "clothing":
+        footwear_tags, footwear_ids, footwear_rating = _block_tags(
+            block.get("footwear") or {},
+        )
+        tags = _merge_tags(
+            tags,
+            footwear_tags,
+            block.get("clothing_state") or [],
+        )
+        used_ids.extend(footwear_ids)
+        if footwear_rating == "R18":
+            rating = "R18"
+    elif block_kind == "expression":
+        tags = _merge_tags(
+            tags,
+            block.get("gaze") or [],
+            block.get("face_details") or [],
+        )
+    elif block_kind == "camera":
+        tags = _merge_tags(
+            tags,
+            block.get("framing") or [],
+            block.get("angle") or [],
+            block.get("focus") or [],
+        )
+    elif block_kind == "scene":
+        tags = _merge_tags(
+            tags,
+            block.get("time") or [],
+            block.get("weather") or [],
+            block.get("foreground") or [],
+            block.get("background") or [],
+        )
+    elif block_kind == "lighting":
+        tags = _merge_tags(
+            tags,
+            block.get("palette") or [],
+            block.get("mood") or [],
+        )
     for ref in block.get("preset_refs") or []:
         preset_id = _text(ref.get("preset_id"))
-        kind = _REFERENCE_KINDS.get(block.get("kind"))
+        kind = _REFERENCE_KINDS.get(block_kind)
         water = water_presets.WATER_PRESETS_BY_ID.get(preset_id)
         if water:
             tags = _merge_tags(tags, water.get("tags") or [])
             used_ids.append(preset_id)
             continue
-        if block.get("kind") in ("appearance", "clothing", "expression"):
-            if block.get("kind") == "expression":
+        if block_kind in ("appearance", "clothing", "expression"):
+            if block_kind == "expression":
                 expression = expression_presets.EXPRESSION_PRESETS_BY_ID.get(
                     preset_id
                 )
                 if expression:
-                    tags = _merge_tags(tags, expression.get("tags") or [])
+                    tags = _merge_tags(
+                        tags,
+                        expression.get("expression_tags")
+                        or expression.get("tags")
+                        or [],
+                        expression.get("gaze") or [],
+                        expression.get("face_details") or [],
+                    )
                     used_ids.append(preset_id)
                     if _text(expression.get("rating")) == "R18":
                         rating = "R18"
                     continue
-            snapshot_tags, snapshot = _appearance_snapshot_tags(ref, block.get("kind"))
+            snapshot_tags, snapshot = _appearance_snapshot_tags(ref, block_kind)
             if snapshot_tags:
                 tags = _merge_tags(tags, snapshot_tags)
                 used_ids.append(preset_id)
@@ -411,7 +512,7 @@ def _block_tags(
                     "appearance": "appearance_tags",
                     "clothing": "clothing_tags",
                     "expression": "expression_tags",
-                }.get(block.get("kind"), "appearance_tags")
+                }.get(block_kind, "appearance_tags")
                 tags = _merge_tags(tags, _tags(snapshot.get(field) or []))
                 used_ids.append(preset_id)
             continue
@@ -513,6 +614,19 @@ def resolve_document(
         used_ids.extend(ids)
         if block_rating == "R18":
             rating = "R18"
+    global_props_block = document["props"]["global"]
+    if global_props_block.get("enabled", True):
+        global_props_tags, global_props_ids, global_props_rating = _block_tags(
+            global_props_block,
+        )
+    else:
+        global_props_tags, global_props_ids, global_props_rating = [], [], "普通"
+    global_props_tags = [
+        f"scene props: {_tag}" for _tag in global_props_tags
+    ]
+    used_ids.extend(global_props_ids)
+    if global_props_rating == "R18":
+        rating = "R18"
 
     character_fragments: list[str] = []
     for character in characters:
@@ -533,6 +647,21 @@ def resolve_document(
                     rating = "R18"
             if kind == "appearance":
                 parts.extend(_body_profile_tags(character))
+            if kind == "clothing":
+                props_block = document["props"]["characters"].get(
+                    character["role_id"]
+                )
+                if props_block and props_block.get("enabled", True):
+                    props_tags, props_ids, props_rating = _block_tags(
+                        props_block,
+                        character=character,
+                        role_id=character["role_id"],
+                    )
+                    parts.extend(props_tags)
+                    selected_ids.extend(props_ids)
+                    used_ids.extend(props_ids)
+                    if props_rating == "R18":
+                        rating = "R18"
         if len(character["clothing"].get("preset_refs") or []) > 3:
             errors.append(f"{character['display_name']} 的服装超过 3 个")
         if len(character["body_modifications"].get("preset_refs") or []) > 2:
@@ -559,13 +688,14 @@ def resolve_document(
         global_fragments.get("quality", []),
         global_fragments.get("style", []),
         global_fragments.get("scene", []),
-        pose_fragments,
-        character_fragments,
-        interaction_tags,
+        global_props_tags,
         global_fragments.get("camera", []),
         global_fragments.get("lighting", []),
-        custom_tags,
         global_fragments.get("constraints", []),
+        character_fragments,
+        pose_fragments,
+        interaction_tags,
+        custom_tags,
     )
     positive = ", ".join(ordered)
     negative_blocks: list[str] = []

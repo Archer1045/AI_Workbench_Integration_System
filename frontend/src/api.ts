@@ -850,6 +850,20 @@ export interface PromptBlock {
   enabled?: boolean;
   source?: string;
   order?: number;
+  gaze?: string[];
+  face_details?: string[];
+  intensity?: number;
+  clothing_state?: string[];
+  footwear?: PromptBlock;
+  framing?: string[];
+  angle?: string[];
+  focus?: string[];
+  time?: string[];
+  weather?: string[];
+  foreground?: string[];
+  background?: string[];
+  palette?: string[];
+  mood?: string[];
 }
 
 export type PromptHeightFrame =
@@ -893,6 +907,10 @@ export interface PromptDocumentV1 {
   mode: PromptDocumentMode;
   global: Record<'quality' | 'style' | 'scene' | 'camera' | 'lighting' | 'constraints', PromptBlock>;
   characters: PromptCharacter[];
+  props: {
+    global: PromptBlock;
+    characters: Record<string, PromptBlock>;
+  };
   interaction: {
     pose_preset?: PromptPresetRef;
     action_tags: string[];
@@ -1116,7 +1134,11 @@ export interface ExpressionPreset {
   label: string;
   translation: string;
   tags: string[];
+  expression_tags?: string[];
+  gaze?: string[];
+  face_details?: string[];
   intensity: string;
+  intensity_value?: number;
   character_scope: string[];
   rating: string;
   nsfw?: boolean;

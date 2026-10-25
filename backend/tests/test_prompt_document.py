@@ -65,6 +65,25 @@ def test_normalize_document_orders_characters_and_normalizes_blocks():
     assert normalized["characters"][0]["appearance"]["tags"] == ["long hair"]
     assert normalized["negative"]["quality"]["tags"] == ["bad anatomy"]
     assert normalized["raw_override"]["prompt"] == "legacy prompt"
+    assert normalized["props"] == {
+        "global": {
+            "id": "props-block",
+            "kind": "props",
+            "tags": [],
+            "preset_refs": [],
+            "preset_snapshot": {},
+            "locked": False,
+            "enabled": True,
+            "source": "manual",
+            "order": 0,
+        },
+        "characters": {},
+    }
+    assert normalized["characters"][0]["expression"]["gaze"] == []
+    assert normalized["characters"][0]["expression"]["face_details"] == []
+    assert normalized["characters"][0]["expression"]["intensity"] == 0.7
+    assert normalized["characters"][0]["clothing"]["clothing_state"] == []
+    assert normalized["characters"][0]["clothing"]["footwear"]["tags"] == []
 
 
 def test_resolve_document_merges_blocks_and_keeps_role_context():
@@ -362,3 +381,95 @@ def test_apply_appearance_preset_to_selected_roles_is_deep_copied():
 
 def test_prompt_composer_scope_is_shared_with_document_resolution():
     assert prompt_document.prompt_composer_scope("女A") == "girlA"
+
+
+def test_extended_fields_and_props_resolve_in_stable_order():
+    resolved = prompt_document.resolve_document(
+        {
+            "mode": "structured",
+            "global": {
+                "quality": {"tags": ["masterpiece"]},
+                "style": {"tags": ["anime style"]},
+                "scene": {
+                    "tags": ["studio"],
+                    "time": ["night"],
+                    "weather": ["rain"],
+                    "foreground": ["window frame"],
+                    "background": ["city lights"],
+                },
+                "camera": {
+                    "tags": ["cinematic"],
+                    "framing": ["full body"],
+                    "angle": ["from below"],
+                    "focus": ["sharp focus"],
+                },
+                "lighting": {
+                    "palette": ["cool"],
+                    "mood": ["dramatic"],
+                },
+                "constraints": {"tags": ["keep both faces visible"]},
+            },
+            "characters": [
+                {
+                    "id": "hero",
+                    "role_id": "girlA",
+                    "display_name": "Hero",
+                    "gender": "女",
+                    "appearance": {"tags": ["long hair"]},
+                    "clothing": {
+                        "tags": ["white dress"],
+                        "clothing_state": ["wet"],
+                        "footwear": {"tags": ["black heels"]},
+                    },
+                    "body_modifications": {"tags": ["tattoo"]},
+                    "pose_or_action": {"tags": ["standing"]},
+                    "expression": {
+                        "tags": ["soft smile"],
+                        "gaze": ["looking at viewer"],
+                        "face_details": ["light blush"],
+                        "intensity": 0.8,
+                    },
+                    "state": {"tags": ["sweat"]},
+                }
+            ],
+            "props": {
+                "global": {"tags": ["chair"]},
+                "characters": {"girlA": {"tags": ["book"]}},
+            },
+            "interaction": {"action_tags": ["holding hands"]},
+        }
+    )
+
+    prompt = resolved["prompt"]
+    expected_order = [
+        "masterpiece",
+        "anime style",
+        "studio",
+        "night",
+        "rain",
+        "window frame",
+        "city lights",
+        "scene props: chair",
+        "cinematic",
+        "full body",
+        "from below",
+        "sharp focus",
+        "cool",
+        "dramatic",
+        "keep both faces visible",
+        "for the first girl (Hero): long hair",
+        "for the first girl (Hero): white dress",
+        "for the first girl (Hero): black heels",
+        "for the first girl (Hero): wet",
+        "for the first girl (Hero): book",
+        "for the first girl (Hero): tattoo",
+        "for the first girl (Hero): standing",
+        "for the first girl (Hero): soft smile",
+        "for the first girl (Hero): looking at viewer",
+        "for the first girl (Hero): light blush",
+        "for the first girl (Hero): sweat",
+        "holding hands",
+    ]
+    positions = [prompt.index(value) for value in expected_order]
+    assert positions == sorted(positions)
+    assert resolved["resolved_document"]["characters"][0]["expression"]["intensity"] == 0.8

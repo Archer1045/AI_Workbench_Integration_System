@@ -11,10 +11,13 @@ import {
   isPromptDocumentEmpty,
   moveCharacter,
   normalizePromptDocument,
+  promptBlockDetailTags,
   removeCharacter,
   resolveCharacterTargets,
   updateCharacter,
   updateCharacterBlock,
+  updateCharacterPropsBlock,
+  updateGlobalPropsBlock,
 } from './promptDocument';
 
 describe('prompt document model', () => {
@@ -37,6 +40,12 @@ describe('prompt document model', () => {
     expect(document.characters[0].appearance.tags).toEqual(['long hair']);
     expect(document.characters[0].clothing.preset_refs).toEqual([]);
     expect(document.global.quality.enabled).toBe(true);
+    expect(document.props).toEqual({
+      global: expect.objectContaining({ tags: [] }),
+      characters: {},
+    });
+    expect(document.characters[0].expression.intensity).toBe(0.7);
+    expect(document.global.camera.framing).toEqual([]);
     expect(document.negative.quality.tags).toEqual([]);
   });
 
@@ -191,6 +200,9 @@ describe('prompt document model', () => {
       name: '柔和微笑',
       category: '基础情绪',
       expression_tags: preset.tags,
+      gaze: [],
+      face_details: [],
+      intensity: 0.7,
     });
     expect(updated.characters[0].expression.source).toBe('expression_preset');
     expect(updated.characters[0].appearance.tags).toEqual([]);
@@ -207,5 +219,90 @@ describe('prompt document model', () => {
     expect(isPromptDocumentEmpty(empty)).toBe(true);
     expect(isPromptDocumentEmpty(structured)).toBe(false);
     expect(isPromptDocumentEmpty(legacy)).toBe(false);
+  });
+
+  it('normalizes and resolves extended classification fields without changing the version', () => {
+    const document = normalizePromptDocument({
+      mode: 'structured',
+      global: {
+        scene: {
+          tags: ['studio'],
+          time: ['night'],
+          weather: ['rain'],
+          foreground: ['window frame'],
+          background: ['city lights'],
+        },
+        camera: {
+          tags: ['cinematic'],
+          framing: ['full body'],
+          angle: ['from below'],
+          focus: ['sharp focus'],
+        },
+        lighting: {
+          palette: ['cool'],
+          mood: ['dramatic'],
+        },
+      },
+      characters: [
+        {
+          id: 'hero',
+          role_id: 'girlA',
+          display_name: 'Hero',
+          gender: '女',
+          clothing: {
+            tags: ['white dress'],
+            clothing_state: ['wet'],
+            footwear: { tags: ['black heels'] },
+          },
+          expression: {
+            tags: ['soft smile'],
+            gaze: ['looking at viewer'],
+            face_details: ['light blush'],
+            intensity: 0.8,
+          },
+        },
+      ],
+      props: {
+        global: { tags: ['chair'] },
+        characters: { girlA: { tags: ['book'] } },
+      },
+    });
+
+    expect(document.version).toBe(1);
+    expect(document.props.global.tags).toEqual(['chair']);
+    expect(document.props.characters.girlA.tags).toEqual(['book']);
+    expect(document.characters[0].clothing.footwear?.tags).toEqual([
+      'black heels',
+    ]);
+    expect(document.characters[0].expression).toMatchObject({
+      gaze: ['looking at viewer'],
+      face_details: ['light blush'],
+      intensity: 0.8,
+    });
+    expect(promptBlockDetailTags(document.global.scene)).toEqual([
+      'studio',
+      'night',
+      'rain',
+      'window frame',
+      'city lights',
+    ]);
+    expect(isPromptDocumentEmpty(document)).toBe(false);
+  });
+
+  it('updates global and per-character props independently', () => {
+    const document = createEmptyStructuredDocument();
+    const withGlobal = updateGlobalPropsBlock(document, (block) => ({
+      ...block,
+      tags: ['chair'],
+    }));
+    const withCharacter = updateCharacterPropsBlock(
+      withGlobal,
+      'girlA',
+      (block) => ({ ...block, tags: ['book'] }),
+    );
+
+    expect(withCharacter.props.global.tags).toEqual(['chair']);
+    expect(withCharacter.props.characters.girlA.tags).toEqual(['book']);
+    expect(withCharacter.characters[0].clothing.tags).toEqual([]);
   });
 });
