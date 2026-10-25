@@ -1,5 +1,5 @@
 // AI 绘画工作区：多组提示词批量生成 + 标签中英对照
-import { AppstoreOutlined, ArrowDownOutlined, ArrowUpOutlined, CloudOutlined, CopyOutlined, DatabaseOutlined, DeleteOutlined, DownOutlined, HolderOutlined, InfoCircleOutlined, InteractionOutlined, LeftOutlined, PictureOutlined, PlusOutlined, RedoOutlined, RightOutlined, SaveOutlined, SettingOutlined, SmileOutlined, StarFilled, StarOutlined, StopOutlined, UndoOutlined, UnorderedListOutlined, UpOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, ArrowDownOutlined, ArrowUpOutlined, CopyOutlined, DatabaseOutlined, DeleteOutlined, DownOutlined, HolderOutlined, InfoCircleOutlined, InteractionOutlined, LeftOutlined, PictureOutlined, PlusOutlined, RedoOutlined, RightOutlined, SaveOutlined, SettingOutlined, StarFilled, StarOutlined, StopOutlined, UndoOutlined, UnorderedListOutlined, UpOutlined } from '@ant-design/icons';
 import { Button, Checkbox, Collapse, Drawer, Image, Input, InputNumber, message, Modal, Popconfirm, Segmented, Select, Space, Switch, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
@@ -30,7 +30,10 @@ import ClothingPresetsModal from './ClothingPresetsModal';
 import ExpressionPresetsModal from './ExpressionPresetsModal';
 import PresetCompositionDrawer, { type PresetCompositionApplyMode } from './PresetCompositionDrawer';
 import PresetCenterDrawer from './PresetCenterDrawer';
-import type { PresetLibraryItem } from './PresetLibraryPanel';
+import type {
+  PresetLibraryApplyOptions,
+  PresetLibraryItem,
+} from './PresetLibraryPanel';
 import ScenePresetsModal from './ScenePresetsModal';
 import WaterPresetsModal from './WaterPresetsModal';
 import DrawLoraSelector from './DrawLoraSelector';
@@ -1065,17 +1068,45 @@ export default function DrawPanel({
     setPresetCompositionOpen(true);
   };
 
-  const applyLibraryItem = (kind: string, item: PresetLibraryItem) => {
+  const applyLibraryItem = (
+    kind: string,
+    item: PresetLibraryItem,
+    options: PresetLibraryApplyOptions,
+  ) => {
     if (kind === 'pose') {
-      insertPoseTags(item as unknown as PosePreset);
+      insertPoseTags(
+        item as unknown as PosePreset,
+        options.poseDetail,
+      );
       return;
     }
     if (kind === 'clothing') {
-      insertClothingPreset(item as unknown as ClothingPreset, 'all');
+      insertClothingPreset(
+        item as unknown as ClothingPreset,
+        options.scope as ClothingScope,
+      );
       return;
     }
     if (kind === 'scene') {
-      insertScenePreset(item as unknown as ScenePreset, 'all');
+      insertScenePreset(
+        item as unknown as ScenePreset,
+        options.scope,
+        options.scenePeoplePolicy,
+      );
+      return;
+    }
+    if (kind === 'expression') {
+      insertExpressionPreset(
+        item as unknown as ExpressionPreset,
+        options.scope,
+      );
+      return;
+    }
+    if (kind === 'water') {
+      insertWaterPreset(
+        item as unknown as WaterPreset,
+        options.scope,
+      );
       return;
     }
     if (kind === 'character') {
@@ -2196,31 +2227,7 @@ export default function DrawPanel({
           onClick={() => setPresetCenterOpen(true)}
           style={{ marginBottom: 8 }}
         >
-          预设
-        </Button>
-        <Button
-          icon={<SmileOutlined />}
-          block
-          onClick={() => setExpressionPresetsOpen(true)}
-          style={{ marginBottom: 8 }}
-        >
-          表情预设
-        </Button>
-        <Button
-          icon={<InteractionOutlined />}
-          block
-          onClick={openPoseTable}
-          style={{ marginBottom: 8 }}
-        >
-          体位预设
-        </Button>
-        <Button
-          icon={<CloudOutlined />}
-          block
-          onClick={() => setWaterPresetsOpen(true)}
-          style={{ marginBottom: 8 }}
-        >
-          水中玩法
+          预设选择器
         </Button>
         <Button block onClick={() => setClothingSetOpen(true)} style={{ marginBottom: 8 }}>
           保存服装集

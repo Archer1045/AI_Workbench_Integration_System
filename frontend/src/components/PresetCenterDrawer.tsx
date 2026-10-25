@@ -6,13 +6,18 @@ import {
   savePresetCenterState,
 } from '../presetLibraryState';
 import PresetLibraryPanel, {
+  type PresetLibraryApplyOptions,
   type PresetLibraryItem,
 } from './PresetLibraryPanel';
 
 export interface PresetCenterDrawerProps {
   open: boolean;
   onClose: () => void;
-  onApply?: (kind: string, item: PresetLibraryItem) => void;
+  onApply?: (
+    kind: string,
+    item: PresetLibraryItem,
+    options: PresetLibraryApplyOptions,
+  ) => void;
   onAddToComposition?: (kind: string, item: PresetLibraryItem) => void;
   onManageThumbnail?: (kind: string, item: PresetLibraryItem) => void;
   onOpenComposition?: () => void;
@@ -107,7 +112,7 @@ export default function PresetCenterDrawer({
 
   return (
     <Drawer
-      title="预设"
+      title="预设选择器"
       width="min(1280px, 96vw)"
       open={open}
       onClose={onClose}

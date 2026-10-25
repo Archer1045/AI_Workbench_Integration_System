@@ -2899,6 +2899,18 @@ body,
   line-height: 1.55;
 }
 
+.preset-library-selection-summary {
+  margin: 10px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .preset-library-detail-tags {
   display: flex;
   flex-wrap: wrap;

@@ -1,9 +1,12 @@
 import {
   AppstoreOutlined,
+  ClockCircleOutlined,
   CopyOutlined,
   PictureOutlined,
   PlusOutlined,
   ReloadOutlined,
+  StarFilled,
+  StarOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
 import {
@@ -23,13 +26,22 @@ import {
 } from 'antd';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  api,
   fetchPresetTypes,
+  type ExpressionPreset,
   type PresetAssetKind,
   type PresetCatalog,
   type PresetKindMetadata,
+  type PresetScope,
   type PresetTaxonomyFields,
   type PresetTypeCatalog,
+  type WaterPreset,
 } from '../api';
+import {
+  PRESET_SCOPE_OPTIONS,
+  type PosePromptDetail,
+  type ScenePeoplePolicy,
+} from '../presetComposition';
 import {
   presetCategoryGroup,
   presetSubcategory,
@@ -37,8 +49,13 @@ import {
 } from './PresetCategoryFilter';
 import {
   createPresetLibraryFilters,
+  loadPresetLibraryActivity,
   loadPresetLibraryViewState,
+  recordPresetLibraryRecent,
+  savePresetLibraryActivity,
   savePresetLibraryViewState,
+  togglePresetLibraryFavorite,
+  type PresetLibraryActivity,
   type PresetLibraryFilters,
 } from '../presetLibraryState';
 import { setPresetAssetSelection } from '../stores/presetAssetStore';
@@ -51,10 +68,56 @@ export type PresetLibraryItem = PresetTaxonomyFields & {
   label: string;
   translation?: string;
   tags?: string[];
+  aliases?: string[];
+  intensity?: string;
+  character_scope?: string[];
+  water_level?: string;
+  target?: string;
   rating?: string;
   nsfw?: boolean;
   image?: string | null;
   has_image?: boolean;
+};
+
+export interface PresetLibraryApplyOptions {
+  scope: PresetScope;
+  poseDetail: PosePromptDetail;
+  scenePeoplePolicy: ScenePeoplePolicy;
+}
+
+type PresetLibraryKind = Pick<
+  PresetKindMetadata,
+  | 'kind'
+  | 'label'
+  | 'order'
+  | 'catalog_key'
+  | 'scope_capable'
+  | 'supports_thumbnail'
+  | 'composition_enabled'
+> & {
+  source: 'catalog' | 'expression' | 'water';
+};
+
+const EXPRESSION_KIND: PresetLibraryKind = {
+  kind: 'expression',
+  label: '表情',
+  order: 2.5,
+  catalog_key: 'expressions',
+  scope_capable: true,
+  supports_thumbnail: false,
+  composition_enabled: false,
+  source: 'expression',
+};
+
+const WATER_KIND: PresetLibraryKind = {
+  kind: 'water',
+  label: '水中',
+  order: 2.6,
+  catalog_key: 'water',
+  scope_capable: true,
+  supports_thumbnail: false,
+  composition_enabled: false,
+  source: 'water',
 };
 
 function catalogItems(
@@ -73,6 +136,11 @@ function itemText(item: PresetLibraryItem): string {
     item.translation,
     presetCategoryGroup(item),
     presetSubcategory(item),
+    item.intensity,
+    item.water_level,
+    item.target,
+    ...(item.aliases || []),
+    ...(item.character_scope || []),
     ...(item.tags || []),
   ]
     .filter(Boolean)
@@ -88,9 +156,40 @@ function itemHidden(item: PresetLibraryItem, restrictionEnabled: boolean): boole
   return restrictionEnabled && itemRating(item) === 'R18';
 }
 
+function itemsForKind(
+  kind: PresetLibraryKind,
+  catalog: PresetCatalog | null,
+  expressions: ExpressionPreset[],
+  waterPresets: WaterPreset[],
+): PresetLibraryItem[] {
+  if (kind.source === 'expression') {
+    return expressions.map((item) => ({
+      ...item,
+      category_group: item.category,
+      subcategory: '表情',
+      has_image: false,
+      image: null,
+    }));
+  }
+  if (kind.source === 'water') {
+    return waterPresets.map((item) => ({
+      ...item,
+      category_group: item.category,
+      subcategory: item.target,
+      has_image: false,
+      image: null,
+    }));
+  }
+  return catalogItems(catalog, kind.catalog_key);
+}
+
 export interface PresetLibraryPanelProps {
   variant?: 'page' | 'drawer';
-  onApply?: (kind: string, item: PresetLibraryItem) => void;
+  onApply?: (
+    kind: string,
+    item: PresetLibraryItem,
+    options: PresetLibraryApplyOptions,
+  ) => void;
   onAddToComposition?: (kind: string, item: PresetLibraryItem) => void;
   onManageThumbnail?: (kind: string, item: PresetLibraryItem) => void;
 }
@@ -103,15 +202,23 @@ export default function PresetLibraryPanel({
 }: PresetLibraryPanelProps) {
   const { restrictionEnabled } = settingsStore;
   const savedView = useMemo(loadPresetLibraryViewState, []);
+  const savedActivity = useMemo(loadPresetLibraryActivity, []);
   const [types, setTypes] = useState<PresetTypeCatalog>({
     items: [],
     composition: { max_items: 12 },
   });
   const [catalog, setCatalog] = useState<PresetCatalog | null>(null);
+  const [expressions, setExpressions] = useState<ExpressionPreset[]>([]);
+  const [waterPresets, setWaterPresets] = useState<WaterPreset[]>([]);
+  const [activity, setActivity] =
+    useState<PresetLibraryActivity>(savedActivity);
   const [activeKind, setActiveKind] = useState(savedView.activeKind);
   const [selectedIds, setSelectedIds] = useState<Record<string, string>>(
     savedView.selectedIds,
   );
+  const [activityMode, setActivityMode] = useState<
+    'all' | 'recent' | 'favorites'
+  >('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(
     savedView.viewMode,
   );
@@ -119,6 +226,10 @@ export default function PresetLibraryPanel({
     savedView.filtersByKind,
   );
   const [loading, setLoading] = useState(false);
+  const [scope, setScope] = useState<PresetScope>('all');
+  const [poseDetail, setPoseDetail] = useState<PosePromptDetail>('core');
+  const [scenePeoplePolicy, setScenePeoplePolicy] =
+    useState<ScenePeoplePolicy>('occupied');
 
   const filters =
     filtersByKind[activeKind] || createPresetLibraryFilters();
@@ -148,11 +259,24 @@ export default function PresetLibraryPanel({
     filtersByKind,
   ]);
 
+  useEffect(() => {
+    savePresetLibraryActivity(activity);
+  }, [activity]);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const [typesResult, catalogResult] = await Promise.allSettled([
+    const [
+      typesResult,
+      catalogResult,
+      expressionsResult,
+      waterResult,
+    ] = await Promise.allSettled([
       fetchPresetTypes(),
-      import('../api').then(({ api }) => api.get<PresetCatalog>('/prompt-agent/preset-catalog')),
+      api.get<PresetCatalog>('/prompt-agent/preset-catalog'),
+      api.get<{ items: ExpressionPreset[] }>(
+        '/prompt-agent/expression-presets',
+      ),
+      api.get<{ items: WaterPreset[] }>('/prompt-agent/water-presets'),
     ]);
     if (typesResult.status === 'fulfilled') {
       setTypes(typesResult.value);
@@ -164,6 +288,16 @@ export default function PresetLibraryPanel({
     } else {
       message.error('预设目录加载失败');
     }
+    setExpressions(
+      expressionsResult.status === 'fulfilled'
+        ? expressionsResult.value.data.items || []
+        : [],
+    );
+    setWaterPresets(
+      waterResult.status === 'fulfilled'
+        ? waterResult.value.data.items || []
+        : [],
+    );
     setLoading(false);
   }, []);
 
@@ -171,11 +305,14 @@ export default function PresetLibraryPanel({
     void load();
   }, [load]);
 
-  const kinds = useMemo(
-    () =>
-      types.items
+  const kinds = useMemo<PresetLibraryKind[]>(
+    () => [
+      ...types.items
         .filter((item) => item.composition_enabled !== false)
-        .sort((left, right) => left.order - right.order),
+        .map((item) => ({ ...item, source: 'catalog' as const })),
+      EXPRESSION_KIND,
+      WATER_KIND,
+    ].sort((left, right) => left.order - right.order),
     [types.items],
   );
 
@@ -186,17 +323,45 @@ export default function PresetLibraryPanel({
     }
   }, [activeKind, kinds]);
 
+  useEffect(() => {
+    setActivityMode('all');
+    setScope('all');
+    setPoseDetail('core');
+    setScenePeoplePolicy('occupied');
+  }, [activeKind]);
+
   const activeMetadata = kinds.find((item) => item.kind === activeKind);
+  const activeItems = useMemo(() => {
+    if (!activeMetadata) return [];
+    return itemsForKind(
+      activeMetadata,
+      catalog,
+      expressions,
+      waterPresets,
+    );
+  }, [activeMetadata, catalog, expressions, waterPresets]);
+  const favorites = activity.favoritesByKind[activeKind] || [];
+  const recent = activity.recentByKind[activeKind] || [];
   const visibleItems = useMemo(
     () =>
       activeMetadata
         ? sortPresetItems(
-            catalogItems(catalog, activeMetadata.catalog_key).filter(
-              (item) => !itemHidden(item, restrictionEnabled),
+            activeItems.filter(
+              (item) =>
+                !itemHidden(item, restrictionEnabled) &&
+                (activityMode !== 'favorites' || favorites.includes(item.id)) &&
+                (activityMode !== 'recent' || recent.includes(item.id)),
             ),
           )
         : [],
-    [activeMetadata, catalog, restrictionEnabled],
+    [
+      activeItems,
+      activeMetadata,
+      activityMode,
+      favorites,
+      recent,
+      restrictionEnabled,
+    ],
   );
 
   const categoryGroups = useMemo(
@@ -259,7 +424,7 @@ export default function PresetLibraryPanel({
 
   const items = useMemo(() => {
     const query = keyword.trim().toLowerCase();
-    return visibleItems.filter((item) => {
+    const filtered = visibleItems.filter((item) => {
       if (categoryGroup && presetCategoryGroup(item) !== categoryGroup) return false;
       if (subcategory && presetSubcategory(item) !== subcategory) return false;
       if (rating && itemRating(item) !== rating) return false;
@@ -267,7 +432,20 @@ export default function PresetLibraryPanel({
       if (resource === 'without_image' && (item.has_image || item.image)) return false;
       return !query || itemText(item).includes(query);
     });
-  }, [categoryGroup, keyword, rating, resource, subcategory, visibleItems]);
+    if (activityMode !== 'recent') return filtered;
+    return filtered.sort(
+      (left, right) => recent.indexOf(left.id) - recent.indexOf(right.id),
+    );
+  }, [
+    activityMode,
+    categoryGroup,
+    keyword,
+    rating,
+    recent,
+    resource,
+    subcategory,
+    visibleItems,
+  ]);
 
   useEffect(() => {
     if (!activeMetadata || items.length === 0) return;
@@ -321,7 +499,21 @@ export default function PresetLibraryPanel({
 
   const applyItem = (item: PresetLibraryItem) => {
     if (!activeMetadata) return;
-    onApply?.(activeMetadata.kind, item);
+    onApply?.(activeMetadata.kind, item, {
+      scope,
+      poseDetail,
+      scenePeoplePolicy,
+    });
+    setActivity((current) =>
+      recordPresetLibraryRecent(current, activeMetadata.kind, item.id),
+    );
+  };
+
+  const favoriteItem = (item: PresetLibraryItem) => {
+    if (!activeMetadata) return;
+    setActivity((current) =>
+      togglePresetLibraryFavorite(current, activeMetadata.kind, item.id),
+    );
   };
 
   const copyId = async (item: PresetLibraryItem) => {
@@ -332,6 +524,33 @@ export default function PresetLibraryPanel({
       message.error('复制失败');
     }
   };
+
+  const selectedIsFavorite = Boolean(
+    selectedItem && favorites.includes(selectedItem.id),
+  );
+  const supportsComposition =
+    activeMetadata?.source === 'catalog' &&
+    activeMetadata.composition_enabled !== false;
+  const supportsThumbnail =
+    activeMetadata?.source === 'catalog' &&
+    activeMetadata.supports_thumbnail !== false;
+  const scopeApplies = Boolean(
+    activeMetadata?.scope_capable &&
+      !(activeKind === 'water' && selectedItem?.target === '环境'),
+  );
+  const selectionTargetLabel =
+    activeKind === 'water' && selectedItem?.target === '环境'
+      ? '环境场景'
+      : activeKind === 'scene'
+        ? scenePeoplePolicy === 'empty'
+          ? '空场景'
+          : '有人场景'
+        : activeKind === 'pose'
+          ? poseDetail === 'full'
+            ? '完整长句'
+            : '精简标签'
+          : PRESET_SCOPE_OPTIONS.find((item) => item.value === scope)
+              ?.label || '全部角色';
 
   return (
     <div className={`preset-library-panel preset-library-panel-${variant}`}>
@@ -356,9 +575,12 @@ export default function PresetLibraryPanel({
       <div className="preset-library-layout">
         <aside className="preset-library-type-nav">
           {kinds.map((kind) => {
-            const count = catalogItems(catalog, kind.catalog_key).filter(
-              (item) => !itemHidden(item, restrictionEnabled),
-            ).length;
+            const count = itemsForKind(
+              kind,
+              catalog,
+              expressions,
+              waterPresets,
+            ).filter((item) => !itemHidden(item, restrictionEnabled)).length;
             return (
               <button
                 type="button"
@@ -383,6 +605,36 @@ export default function PresetLibraryPanel({
               placeholder="搜索名称、ID、标签或分类"
               onChange={(event) => updateFilters({ keyword: event.target.value })}
             />
+            {scopeApplies ? (
+              <Select
+                aria-label="插入目标"
+                value={scope}
+                options={PRESET_SCOPE_OPTIONS}
+                onChange={(value) => setScope(value)}
+              />
+            ) : null}
+            {activeKind === 'pose' ? (
+              <Select
+                aria-label="体位提示词版本"
+                value={poseDetail}
+                options={[
+                  { label: '精简标签', value: 'core' },
+                  { label: '完整长句', value: 'full' },
+                ]}
+                onChange={(value) => setPoseDetail(value)}
+              />
+            ) : null}
+            {activeKind === 'scene' ? (
+              <Select
+                aria-label="场景人物策略"
+                value={scenePeoplePolicy}
+                options={[
+                  { label: '有人场景', value: 'occupied' },
+                  { label: '空场景', value: 'empty' },
+                ]}
+                onChange={(value) => setScenePeoplePolicy(value)}
+              />
+            ) : null}
             <Select
               allowClear
               value={categoryGroup || undefined}
@@ -430,6 +682,32 @@ export default function PresetLibraryPanel({
           </div>
 
           <div className="preset-library-filter-chips">
+            <Button
+              size="small"
+              type={activityMode === 'recent' ? 'primary' : 'text'}
+              icon={<ClockCircleOutlined />}
+              aria-label="只看最近使用"
+              onClick={() =>
+                setActivityMode((current) =>
+                  current === 'recent' ? 'all' : 'recent',
+                )
+              }
+            >
+              最近 {recent.length}
+            </Button>
+            <Button
+              size="small"
+              type={activityMode === 'favorites' ? 'primary' : 'text'}
+              icon={<StarOutlined />}
+              aria-label="只看收藏"
+              onClick={() =>
+                setActivityMode((current) =>
+                  current === 'favorites' ? 'all' : 'favorites',
+                )
+              }
+            >
+              收藏 {favorites.length}
+            </Button>
             {categoryGroup ? (
               <Tag
                 closable
@@ -514,6 +792,9 @@ export default function PresetLibraryPanel({
                           ) : (
                             <Tag>普通</Tag>
                           )}
+                          {favorites.includes(item.id) ? (
+                            <Tag color="gold">已收藏</Tag>
+                          ) : null}
                           <Tag>{presetCategoryGroup(item)}</Tag>
                           <Tag>{presetSubcategory(item)}</Tag>
                         </Space>
@@ -564,6 +845,14 @@ export default function PresetLibraryPanel({
                 <div className="preset-library-detail-description">
                   {selectedItem.translation || '暂无中文说明'}
                 </div>
+                <div className="preset-library-selection-summary">
+                  本次插入：{activeMetadata.label} · {selectedItem.label}
+                  {activeMetadata.scope_capable ||
+                  activeKind === 'scene' ||
+                  activeKind === 'pose'
+                    ? ` · ${selectionTargetLabel}`
+                    : ''}
+                </div>
                 <div className="preset-library-detail-tags">
                   {(selectedItem.tags || []).map((tag) => (
                     <Tag key={tag}>{tag}</Tag>
@@ -572,6 +861,16 @@ export default function PresetLibraryPanel({
               </div>
               <div className="preset-library-detail-actions">
                 <Space direction="vertical" style={{ width: '100%' }}>
+                  <Button
+                    block
+                    icon={selectedIsFavorite ? <StarFilled /> : <StarOutlined />}
+                    aria-label={
+                      selectedIsFavorite ? '取消收藏预设' : '收藏预设'
+                    }
+                    onClick={() => favoriteItem(selectedItem)}
+                  >
+                    {selectedIsFavorite ? '已收藏' : '收藏'}
+                  </Button>
                   {onApply ? (
                     <Button
                       type="primary"
@@ -581,20 +880,24 @@ export default function PresetLibraryPanel({
                       应用到当前提示词
                     </Button>
                   ) : null}
-                  <Button
-                    block
-                    icon={<PlusOutlined />}
-                    onClick={() => addToComposition(selectedItem)}
-                  >
-                    加入组合
-                  </Button>
-                  <Button
-                    block
-                    icon={<PictureOutlined />}
-                    onClick={() => manageThumbnail(selectedItem)}
-                  >
-                    管理缩略图
-                  </Button>
+                  {supportsComposition ? (
+                    <Button
+                      block
+                      icon={<PlusOutlined />}
+                      onClick={() => addToComposition(selectedItem)}
+                    >
+                      加入组合
+                    </Button>
+                  ) : null}
+                  {supportsThumbnail ? (
+                    <Button
+                      block
+                      icon={<PictureOutlined />}
+                      onClick={() => manageThumbnail(selectedItem)}
+                    >
+                      管理缩略图
+                    </Button>
+                  ) : null}
                   <Button
                     block
                     icon={<CopyOutlined />}
