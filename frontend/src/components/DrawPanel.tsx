@@ -39,6 +39,19 @@ import WaterPresetsModal from './WaterPresetsModal';
 import DrawLoraSelector from './DrawLoraSelector';
 import DrawGenerationSettingsPanel from './DrawGenerationSettingsPanel';
 import DrawPromptOutlineDrawer from './DrawPromptOutlineDrawer';
+import DrawPreflightDrawer from './DrawPreflightDrawer';
+import DrawPromptFragmentsDrawer from './DrawPromptFragmentsDrawer';
+import DrawPromptHistoryDrawer from './DrawPromptHistoryDrawer';
+import {
+  applyDrawPromptFragment,
+  type DrawPromptFragment,
+} from '../drawPromptFragments';
+import {
+  loadDrawPromptHistory,
+  recordDrawPromptVersion,
+  saveDrawPromptHistory,
+  type DrawPromptVersion,
+} from '../drawPromptHistory';
 import { applyPreset, deletePreset, loadPresets, savePreset, type DrawPreset } from '../stores/presets';
 import {
   applyLoraCombo,
@@ -477,6 +490,10 @@ export default function DrawPanel({
   const [navMode, setNavMode] = useState<'loop' | 'stop'>('loop');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
+  const [fragmentsOpen, setFragmentsOpen] = useState(false);
+  const [preflightOpen, setPreflightOpen] = useState(false);
+  const [promptHistoryOpen, setPromptHistoryOpen] = useState(false);
+  const [promptHistory, setPromptHistory] = useState(loadDrawPromptHistory);
   const [favoriteResults, setFavoriteResults] = useState<string[]>(loadDrawResultFavorites);
   const makeHistorySnapshot = (): DrawHistorySnapshot =>
     cloneDrawHistory({
@@ -1764,6 +1781,31 @@ export default function DrawPanel({
     return () => clearTimeout(timer);
   }, [negativePrompt]);
 
+  useEffect(() => {
+    saveDrawPromptHistory(promptHistory);
+  }, [promptHistory]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPromptHistory((current) => {
+        let next = current;
+        for (const group of groups) {
+          const prompt =
+            group.mode === 'structured'
+              ? structuredPreviews[group.id]?.prompt || group.prompt
+              : group.prompt;
+          next = recordDrawPromptVersion(next, group.id, {
+            mode: group.mode,
+            prompt,
+            document: group.prompt_document || null,
+          });
+        }
+        return next;
+      });
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [groupPromptKey, structuredPreviewKey]);
+
   const handleClearPrompts = () => {
     Modal.confirm({
       title: '确认清空所有提示词？',
@@ -1782,6 +1824,63 @@ export default function DrawPanel({
         message.success('已清空提示词');
       },
     });
+  };
+
+  const insertPromptFragment = (fragment: DrawPromptFragment) => {
+    let target =
+      drawStore.groups.find((group) => group.id === activeGroupId) ||
+      drawStore.groups[0];
+    if (!target) {
+      target = createDrawGroup(
+        '',
+        `group-fragment-${Date.now()}`,
+        'structured',
+      );
+      drawStore.groups = [target];
+      setActiveGroupId(target.id);
+    }
+    if (target.mode === 'legacy') {
+      if (fragment.target.startsWith('negative_')) {
+        drawStore.negativePrompt = mergeTags(
+          tagsOf(drawStore.negativePrompt),
+          fragment.tags,
+        ).join(', ');
+      } else {
+        updateGroupPrompt(
+          target.id,
+          mergeTags(tagsOf(target.prompt), fragment.tags).join(', '),
+        );
+      }
+    } else {
+      updateGroupDocument(
+        target.id,
+        applyDrawPromptFragment(
+          normalizePromptDocument(
+            target.prompt_document || createEmptyStructuredDocument(),
+          ),
+          fragment,
+        ),
+      );
+    }
+    message.success(
+      `已插入「${fragment.label}」${
+        fragment.target.startsWith('negative_') ? '到负向提示词' : ''
+      }`,
+    );
+  };
+
+  const restorePromptHistoryVersion = (version: DrawPromptVersion) => {
+    if (!activeGroup) return;
+    setGroupMode(activeGroup.id, version.mode);
+    if (version.document) {
+      updateGroupDocument(
+        activeGroup.id,
+        clonePromptDocument(version.document),
+      );
+    } else {
+      updateGroupPrompt(activeGroup.id, version.prompt);
+    }
+    message.success('已恢复提示词版本');
   };
 
   const copyCurrentSeed = async () => {
@@ -2431,6 +2530,14 @@ export default function DrawPanel({
         <Button icon={<DatabaseOutlined />} block onClick={() => setPromptSetsOpen(true)} style={{ marginBottom: 8 }}>
           提示词集
         </Button>
+        <Button
+          icon={<UnorderedListOutlined />}
+          block
+          onClick={() => setFragmentsOpen(true)}
+          style={{ marginBottom: 8 }}
+        >
+          提示词片段
+        </Button>
         <Button icon={<PictureOutlined />} block onClick={() => setImageLibraryOpen(true)} style={{ marginBottom: 8 }}>
           图片库
         </Button>
@@ -2493,6 +2600,21 @@ export default function DrawPanel({
               onClick={() => setOutlineOpen(true)}
             >
               提示词大纲
+            </Button>
+            <Button
+              size="small"
+              type="text"
+              onClick={() => setPromptHistoryOpen(true)}
+            >
+              版本历史
+            </Button>
+            <Button
+              size="small"
+              type="text"
+              icon={<InfoCircleOutlined />}
+              onClick={() => setPreflightOpen(true)}
+            >
+              生成前摘要
             </Button>
           </Space>
         </div>
@@ -3019,6 +3141,41 @@ export default function DrawPanel({
           validationText={validationText}
         />
       </Drawer>
+      <DrawPromptFragmentsDrawer
+        open={fragmentsOpen}
+        onClose={() => setFragmentsOpen(false)}
+        onInsert={insertPromptFragment}
+      />
+      <DrawPreflightDrawer
+        open={preflightOpen}
+        onClose={() => setPreflightOpen(false)}
+        groups={groups}
+        previews={structuredPreviews}
+        model={model}
+        width={width}
+        height={height}
+        steps={steps}
+        cfg={cfg}
+        loras={loras}
+        negativePrompt={negativePrompt}
+      />
+      <DrawPromptHistoryDrawer
+        open={promptHistoryOpen}
+        onClose={() => setPromptHistoryOpen(false)}
+        group={activeGroup || null}
+        versions={
+          activeGroup ? promptHistory[activeGroup.id] || [] : []
+        }
+        currentPrompt={
+          activeGroup
+            ? activeGroup.mode === 'structured'
+              ? structuredPreviews[activeGroup.id]?.prompt ||
+                activeGroup.prompt
+              : activeGroup.prompt
+            : ''
+        }
+        onRestore={restorePromptHistoryVersion}
+      />
       <DrawPromptOutlineDrawer
         open={outlineOpen}
         onClose={() => setOutlineOpen(false)}

@@ -5277,3 +5277,147 @@ body,
   align-items: center;
   margin-top: 8px;
 }
+
+.draw-fragment-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.draw-fragment-toolbar > .ant-input-affix-wrapper {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.draw-fragment-item {
+  align-items: flex-start !important;
+  gap: 16px;
+}
+
+.draw-fragment-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.draw-fragment-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.draw-fragment-description {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.draw-preflight-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.draw-preflight-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.draw-preflight-groups,
+.draw-preflight-issues {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.draw-preflight-group {
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.draw-preflight-group > div:first-child {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.draw-preflight-prompt {
+  margin: 6px 0;
+  color: #374151;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.draw-history-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.draw-history-item {
+  cursor: pointer;
+  border-radius: 8px;
+  padding-inline: 10px !important;
+}
+
+.draw-history-item.active {
+  background: #eff6ff;
+}
+
+.draw-history-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.draw-history-copy > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.draw-history-copy > span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.draw-history-copy p {
+  margin: 0;
+  color: #374151;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.draw-history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.draw-history-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@media (max-width: 760px) {
+  .draw-history-layout {
+    grid-template-columns: 1fr;
+  }
+}
