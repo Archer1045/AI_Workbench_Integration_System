@@ -297,6 +297,58 @@ def test_character_outfit_migration_upgrades_legacy_table(tmp_path, monkeypatch)
     assert "black and white dress" not in columbina["appearance_tags"]
 
 
+def test_migration_033_upgrades_existing_v32_table_before_indexes(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(database, "DB_PATH", tmp_path / "v32_upgrade.db")
+    with database.get_connection() as conn:
+        conn.executescript(
+            """
+            CREATE TABLE character_appearance_presets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                preset_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                work TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '自由备注',
+                appearance_tags TEXT NOT NULL DEFAULT '[]',
+                clothing_tags TEXT NOT NULL DEFAULT '[]',
+                expression_tags TEXT NOT NULL DEFAULT '[]',
+                outfit_id TEXT NOT NULL DEFAULT '',
+                note TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT 'user',
+                version INTEGER NOT NULL DEFAULT 1,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(preset_id, version)
+            );
+            PRAGMA user_version = 32;
+            """
+        )
+
+    database.init_db()
+
+    with database.get_connection() as conn:
+        columns = {
+            row["name"]
+            for row in conn.execute(
+                "PRAGMA table_info(character_appearance_presets)"
+            ).fetchall()
+        }
+        index = conn.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type = 'index'
+              AND name = 'idx_character_appearance_presets_outfit_set'
+            """
+        ).fetchone()
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+    assert version == 33
+    assert {"outfit_set_id", "outfit_set_version"} <= columns
+    assert index is not None
+
+
 def test_character_visual_correction_migration_upgrades_stale_rows(
     tmp_path,
     monkeypatch,

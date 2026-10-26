@@ -259,8 +259,6 @@ CREATE INDEX IF NOT EXISTS idx_character_appearance_presets_lookup
     ON character_appearance_presets(preset_id, version);
 CREATE INDEX IF NOT EXISTS idx_character_appearance_presets_filter
     ON character_appearance_presets(category, source, enabled);
-CREATE INDEX IF NOT EXISTS idx_character_appearance_presets_outfit_set
-    ON character_appearance_presets(outfit_set_id, version);
 CREATE TABLE IF NOT EXISTS outfit_presets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     preset_id TEXT NOT NULL,
