@@ -224,6 +224,13 @@ export const FALLBACK_RUNTIME_CONFIG: RuntimeConfig = {
       user_negative: '',
     },
   },
+  image_tools: {
+    max_bytes: 25_000_000,
+    max_pixels: 12_000_000,
+    max_concurrency: 1,
+    roughness_ratio_max: 0.85,
+    min_roughness_drop: 0.02,
+  },
   settings: {
     health_interval_default: 15,
     health_interval_min: 5,
@@ -307,6 +314,10 @@ function mergeRuntimeConfig(value: Partial<RuntimeConfig>): RuntimeConfig {
         ...FALLBACK_RUNTIME_CONFIG.preset_assets.defaults,
         ...value.preset_assets?.defaults,
       },
+    },
+    image_tools: {
+      ...FALLBACK_RUNTIME_CONFIG.image_tools,
+      ...value.image_tools,
     },
     settings: { ...FALLBACK_RUNTIME_CONFIG.settings, ...value.settings },
     query: { ...FALLBACK_RUNTIME_CONFIG.query, ...value.query },

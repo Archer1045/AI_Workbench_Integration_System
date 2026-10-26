@@ -4,3 +4,4 @@ python-multipart==0.0.20
 openpyxl==3.1.5
 requests==2.34.2
 Pillow==12.3.0
+numpy==2.2.5

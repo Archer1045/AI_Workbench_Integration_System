@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import ActionComposerPanel from './ActionComposerPanel';
 import DrawPanel from './DrawPanel';
+import ImageDeobfuscationPanel from './ImageDeobfuscationPanel';
 import InpaintPanel from './InpaintPanel';
 
-type DrawingMode = 'draw' | 'inpaint' | 'composer';
+type DrawingMode = 'draw' | 'inpaint' | 'composer' | 'deobfuscation';
 
 const MODE_KEY = 'rider-studio:ai-drawing-mode-v1';
 
 function loadMode(): DrawingMode {
   try {
     const value = localStorage.getItem(MODE_KEY);
-    return value === 'composer' || value === 'inpaint' ? value : 'draw';
+    return value === 'composer' || value === 'inpaint' || value === 'deobfuscation'
+      ? value
+      : 'draw';
   } catch {
     return 'draw';
   }
@@ -65,6 +68,15 @@ export default function AIDrawingWorkspace() {
         >
           动作编排
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'deobfuscation'}
+          className={mode === 'deobfuscation' ? 'active' : ''}
+          onClick={() => setMode('deobfuscation')}
+        >
+          图片解混淆
+        </button>
       </div>
       <div className="ai-drawing-mode-panel" hidden={mode !== 'draw'}>
         <DrawPanel
@@ -84,6 +96,9 @@ export default function AIDrawingWorkspace() {
           activeGroupId={activeGroupId}
           onApplied={() => setMode('draw')}
         />
+      </div>
+      <div className="ai-drawing-mode-panel" hidden={mode !== 'deobfuscation'}>
+        <ImageDeobfuscationPanel active={mode === 'deobfuscation'} />
       </div>
     </div>
   );

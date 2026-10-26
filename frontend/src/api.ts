@@ -158,6 +158,13 @@ export interface RuntimeConfig {
     targets: Record<PresetAssetKind, PresetAssetTarget>;
     defaults: PresetAssetSettings;
   };
+  image_tools: {
+    max_bytes: number;
+    max_pixels: number;
+    max_concurrency: number;
+    roughness_ratio_max: number;
+    min_roughness_drop: number;
+  };
   settings: {
     health_interval_default: number;
     health_interval_min: number;
@@ -415,6 +422,54 @@ export interface PresetAssetCatalogFacet {
   label: string;
   count: number;
   order?: number;
+}
+
+export interface ImageToolReport {
+  algorithm: string;
+  operation: 'decode' | 'encode';
+  source_format: string;
+  width: number;
+  height: number;
+  mode: string;
+  pixel_count: number;
+  roughness_before: number;
+  roughness_after: number;
+  roughness_ratio: number;
+  accepted: boolean;
+  forced: boolean;
+  input_sha256: string;
+  output_sha256: string;
+}
+
+export interface ImageToolResult {
+  blob: Blob;
+  report: ImageToolReport;
+}
+
+function decodeHeaderJson<T>(value: string | undefined): T {
+  if (!value) throw new Error('服务未返回图片处理报告');
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes)) as T;
+}
+
+export async function deobfuscateImage(
+  file: File,
+  options: { force?: boolean } = {},
+): Promise<ImageToolResult> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  const response = await api.post<Blob>('/image-tools/deobfuscate', form, {
+    params: { force: Boolean(options.force) },
+    responseType: 'blob',
+    timeout: 120000,
+  });
+  return {
+    blob: response.data,
+    report: decodeHeaderJson<ImageToolReport>(response.headers['x-image-tool-report']),
+  };
 }
 
 export interface PresetAssetCatalogFacets {

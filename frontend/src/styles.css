@@ -3268,6 +3268,102 @@ body,
   display: none;
 }
 
+.image-tool-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.image-tool-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.image-tool-header h3 {
+  margin: 0;
+}
+
+.image-tool-header .ant-typography {
+  margin: 4px 0 0;
+  color: #64748b;
+}
+
+.image-tool-input-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.image-tool-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.image-tool-force-hint {
+  margin-top: 6px;
+}
+
+.image-tool-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.image-tool-preview-card {
+  min-width: 0;
+}
+
+.image-tool-preview-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.image-tool-preview-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  max-height: 68vh;
+  overflow: auto;
+  border-radius: 8px;
+  background:
+    linear-gradient(45deg, #eef2f7 25%, transparent 25%),
+    linear-gradient(-45deg, #eef2f7 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #eef2f7 75%),
+    linear-gradient(-45deg, transparent 75%, #eef2f7 75%);
+  background-color: #f8fafc;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+
+.image-tool-preview-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
+}
+
+.image-tool-hash {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+.image-tool-report-note {
+  margin: 12px 0 0;
+}
+
 .inpaint-panel {
   display: flex;
   flex-direction: column;
@@ -3454,6 +3550,10 @@ body,
 }
 
 @media (max-width: 900px) {
+  .image-tool-compare {
+    grid-template-columns: 1fr;
+  }
+
   .inpaint-grid {
     grid-template-columns: 1fr;
   }

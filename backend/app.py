@@ -23,7 +23,7 @@ import preset_asset_service  # noqa: E402
 import services  # noqa: E402
 import task_registry  # noqa: E402
 import task_resources  # noqa: E402
-from routers import chat, companion, draw, preset_assets, prompt, prompt_sets, records, resources, services_router, settings_router, train, video  # noqa: E402
+from routers import chat, companion, draw, image_tools, preset_assets, prompt, prompt_sets, records, resources, services_router, settings_router, train, video  # noqa: E402
 from game_assistant import account_router as game_assistant_account_router  # noqa: E402
 from game_assistant import combat_router as game_assistant_combat_router  # noqa: E402
 from game_assistant import execution_router as game_assistant_execution_router  # noqa: E402
@@ -102,6 +102,7 @@ app.include_router(companion.router)
 app.include_router(resources.router)
 app.include_router(video.router)
 app.include_router(preset_assets.router)
+app.include_router(image_tools.router)
 app.include_router(game_assistant_router.router)
 app.include_router(game_assistant_account_router.router)
 app.include_router(game_assistant_combat_router.router)

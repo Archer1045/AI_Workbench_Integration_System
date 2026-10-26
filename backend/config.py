@@ -364,6 +364,24 @@ PRESET_ASSET_TARGETS = {
         "quality": 90,
     },
 }
+IMAGE_DEOBFUSCATION_MAX_BYTES = _env_int(
+    "IMAGE_DEOBFUSCATION_MAX_BYTES", 25_000_000
+)
+IMAGE_DEOBFUSCATION_MAX_PIXELS = _env_int(
+    "IMAGE_DEOBFUSCATION_MAX_PIXELS", 12_000_000
+)
+IMAGE_DEOBFUSCATION_ROUGHNESS_RATIO_MAX = _env_float(
+    "IMAGE_DEOBFUSCATION_ROUGHNESS_RATIO_MAX", 0.85
+)
+IMAGE_DEOBFUSCATION_MIN_ROUGHNESS_DROP = _env_float(
+    "IMAGE_DEOBFUSCATION_MIN_ROUGHNESS_DROP", 0.02
+)
+IMAGE_DEOBFUSCATION_MAX_CONCURRENCY = _env_int(
+    "IMAGE_DEOBFUSCATION_MAX_CONCURRENCY", 1
+)
+IMAGE_DEOBFUSCATION_CURVE_CACHE_MAX_PIXELS = _env_int(
+    "IMAGE_DEOBFUSCATION_CURVE_CACHE_MAX_PIXELS", 1_000_000
+)
 PRESET_ASSET_DEFAULT_SETTINGS = {
     "version": 1,
     "model": DRAW_DEFAULT_MODEL,
@@ -582,6 +600,13 @@ def runtime_config() -> dict:
                 for kind, target in PRESET_ASSET_TARGETS.items()
             },
             "defaults": PRESET_ASSET_DEFAULT_SETTINGS,
+        },
+        "image_tools": {
+            "max_bytes": IMAGE_DEOBFUSCATION_MAX_BYTES,
+            "max_pixels": IMAGE_DEOBFUSCATION_MAX_PIXELS,
+            "max_concurrency": IMAGE_DEOBFUSCATION_MAX_CONCURRENCY,
+            "roughness_ratio_max": IMAGE_DEOBFUSCATION_ROUGHNESS_RATIO_MAX,
+            "min_roughness_drop": IMAGE_DEOBFUSCATION_MIN_ROUGHNESS_DROP,
         },
         "settings": {
             "health_interval_default": SETTINGS_HEALTH_INTERVAL_DEFAULT,
