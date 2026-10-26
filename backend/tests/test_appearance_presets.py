@@ -196,3 +196,91 @@ def test_legacy_character_cache_can_be_imported_as_preset(client):
     assert item["source"] == "legacy_cache"
     assert item["appearance_tags"] == ["long hair", "blue eyes"]
     assert item["clothing_tags"] == ["white dress"]
+
+
+def test_appearance_preset_pins_and_applies_default_outfit_set(client):
+    outfit = client.post(
+        "/api/prompt-agent/outfit-presets",
+        json={
+            "name": "角色套装 v1",
+            "items": [
+                {"clothing_id": "organza_overlay_shirt"},
+                {"clothing_id": "tulle_tiered_midi_skirt"},
+                {"clothing_id": "shoe_mary_janes"},
+            ],
+        },
+    )
+    assert outfit.status_code == 200, outfit.text
+    outfit_v1 = outfit.json()["item"]
+
+    created = client.post(
+        "/api/prompt-agent/appearance-presets",
+        json={
+            "name": "带默认套装的角色",
+            "work": "Test Work",
+            "category": "角色",
+            "appearance_tags": ["silver hair"],
+            "clothing_tags": ["atomic fallback"],
+            "expression_tags": [],
+            "outfit_id": "outfit_test_atomic_fallback",
+            "outfit_set_id": outfit_v1["preset_id"],
+            "outfit_set_version": 1,
+        },
+    )
+    assert created.status_code == 200, created.text
+    item = created.json()["item"]
+    assert item["outfit_id"] == "outfit_test_atomic_fallback"
+    assert item["outfit_set_id"] == outfit_v1["preset_id"]
+    assert item["outfit_set_version"] == 1
+    assert item["outfit_set_name"] == "角色套装 v1"
+    assert item["outfit_set_items"]
+
+    updated_outfit = client.put(
+        f"/api/prompt-agent/outfit-presets/{outfit_v1['preset_id']}",
+        json={
+            "name": "角色套装 v2",
+            "items": [
+                {"clothing_id": "chiffon_draped_blouse"},
+                {"clothing_id": "shoe_black_stiletto_heels"},
+            ],
+        },
+    )
+    assert updated_outfit.status_code == 200
+
+    applied_v1 = client.post(
+        f"/api/prompt-agent/appearance-presets/{item['preset_id']}/apply",
+        json={"version": item["version"]},
+    )
+    assert applied_v1.status_code == 200
+    default_set = applied_v1.json()["default_outfit_set"]
+    assert default_set["version"] == 1
+    assert default_set["name"] == "角色套装 v1"
+    assert default_set["content_hash"] == outfit_v1["content_hash"]
+
+    pinned_v2 = client.put(
+        f"/api/prompt-agent/appearance-presets/{item['preset_id']}",
+        json={"outfit_set_version": 2},
+    )
+    assert pinned_v2.status_code == 200
+    assert pinned_v2.json()["item"]["outfit_set_version"] == 2
+    applied_v2 = client.post(
+        f"/api/prompt-agent/appearance-presets/{item['preset_id']}/apply",
+        json={"version": pinned_v2.json()["item"]["version"]},
+    )
+    assert applied_v2.status_code == 200
+    assert applied_v2.json()["default_outfit_set"]["version"] == 2
+
+
+def test_appearance_preset_rejects_missing_outfit_set_version(client):
+    response = client.post(
+        "/api/prompt-agent/appearance-presets",
+        json={
+            "name": "坏套装关联",
+            "category": "角色",
+            "appearance_tags": ["silver hair"],
+            "outfit_set_id": "outfit_campus_cream",
+            "outfit_set_version": 999,
+        },
+    )
+    assert response.status_code == 400
+    assert "套装或版本不存在" in response.json()["detail"]

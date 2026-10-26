@@ -181,3 +181,86 @@ def test_outfit_api_create_update_duplicate_and_delete(client) -> None:
     assert client.get(
         f"/api/prompt-agent/outfit-presets/{duplicated['preset_id']}"
     ).status_code == 404
+
+
+def test_outfit_versions_and_append_only_rollback(client) -> None:
+    created = client.post(
+        "/api/prompt-agent/outfit-presets",
+        json=_payload(name="回滚测试 v1"),
+    ).json()["item"]
+    preset_id = created["preset_id"]
+
+    updated = client.put(
+        f"/api/prompt-agent/outfit-presets/{preset_id}",
+        json=_payload(
+            name="回滚测试 v2",
+            items=[
+                {"clothing_id": "chiffon_draped_blouse"},
+                {"clothing_id": "shoe_black_stiletto_heels"},
+            ],
+        ),
+    )
+    assert updated.status_code == 200
+    second = updated.json()["item"]
+    assert second["version"] == 2
+    assert second["content_hash"] != created["content_hash"]
+
+    versions = client.get(
+        f"/api/prompt-agent/outfit-presets/{preset_id}/versions"
+    )
+    assert versions.status_code == 200
+    assert [item["version"] for item in versions.json()["items"]] == [2, 1]
+
+    restored = client.post(
+        f"/api/prompt-agent/outfit-presets/{preset_id}/rollback",
+        json={"version": 1},
+    )
+    assert restored.status_code == 200
+    third = restored.json()["item"]
+    assert third["version"] == 3
+    assert third["name"] == created["name"]
+    assert third["content_hash"] == created["content_hash"]
+
+    versions_after = client.get(
+        f"/api/prompt-agent/outfit-presets/{preset_id}/versions"
+    ).json()["items"]
+    assert [item["version"] for item in versions_after] == [3, 2, 1]
+    assert versions_after[1]["name"] == "回滚测试 v2"
+
+
+def test_referenced_user_outfit_cannot_be_deleted(client) -> None:
+    outfit = client.post(
+        "/api/prompt-agent/outfit-presets",
+        json=_payload(name="角色默认套装"),
+    ).json()["item"]
+    appearance = client.post(
+        "/api/prompt-agent/appearance-presets",
+        json={
+            "name": "套装角色",
+            "work": "Test Work",
+            "category": "角色",
+            "appearance_tags": ["test character"],
+            "clothing_tags": [],
+            "expression_tags": [],
+            "outfit_id": "",
+            "outfit_set_id": outfit["preset_id"],
+            "outfit_set_version": outfit["version"],
+        },
+    )
+    assert appearance.status_code == 200, appearance.text
+
+    blocked = client.delete(
+        f"/api/prompt-agent/outfit-presets/{outfit['preset_id']}"
+    )
+    assert blocked.status_code == 409
+    assert "角色外观预设引用" in blocked.json()["detail"]
+
+    preset_id = appearance.json()["item"]["preset_id"]
+    removed_appearance = client.delete(
+        f"/api/prompt-agent/appearance-presets/{preset_id}"
+    )
+    assert removed_appearance.status_code == 200
+    deleted = client.delete(
+        f"/api/prompt-agent/outfit-presets/{outfit['preset_id']}"
+    )
+    assert deleted.status_code == 200

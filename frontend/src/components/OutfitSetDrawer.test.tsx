@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OutfitSetCatalog } from '../api';
 import OutfitSetDrawer from './OutfitSetDrawer';
@@ -114,5 +114,63 @@ describe('OutfitSetDrawer', () => {
     expect(
       screen.getByRole('button', { name: '生成 4 张预览' }),
     ).toBeEnabled();
+  });
+
+  it('lists saved versions before an append-only rollback', async () => {
+    const current = {
+      ...catalog.items[0],
+      source: 'user',
+      version: 2,
+      name: '奶油校园 v2',
+    };
+    const previous = {
+      ...catalog.items[0],
+      source: 'user',
+      version: 1,
+      name: '奶油校园 v1',
+    };
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/prompt-agent/outfit-presets') {
+        return Promise.resolve({
+          data: { ...catalog, items: [current] },
+        });
+      }
+      if (url.includes('/versions')) {
+        return Promise.resolve({
+          data: { items: [current, previous], total: 2 },
+        });
+      }
+      return Promise.resolve({
+        data: {
+          items: [
+            {
+              id: 'school_uniform_jk',
+              category: '校服/制服',
+              label: 'JK 校服',
+              translation: '白色衬衫与百褶裙',
+              tags: ['school uniform', 'pleated skirt'],
+              gender: '女',
+              part: '全身',
+              nsfw: false,
+              rating: '普通',
+            },
+          ],
+        },
+      });
+    });
+
+    render(<OutfitSetDrawer open onClose={() => undefined} onApply={() => true} />);
+    await screen.findAllByText('奶油校园 v2');
+    fireEvent.click(screen.getByRole('button', { name: /历史版本/ }));
+
+    await waitFor(() =>
+      expect(apiMocks.get).toHaveBeenCalledWith(
+        `/prompt-agent/outfit-presets/${current.preset_id}/versions`,
+      ),
+    );
+    expect(await screen.findByText('回滚不会删除历史版本')).toBeInTheDocument();
+    expect(screen.getByText('奶油校园 v1')).toBeInTheDocument();
+    expect(screen.getByText('当前版本')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '恢复此版本' })).toBeInTheDocument();
   });
 });

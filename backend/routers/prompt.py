@@ -52,6 +52,36 @@ def _appearance_with_outfit(item: dict) -> dict:
     result = dict(item)
     outfit = _CLOTHING_PRESETS_BY_ID.get(str(result.get("outfit_id") or ""))
     result["outfit_name"] = str(outfit["label"]) if outfit else ""
+    set_id = str(result.get("outfit_set_id") or "")
+    set_version = int(result.get("outfit_set_version") or 0)
+    outfit_set = database.get_outfit_preset(
+        set_id,
+        set_version if set_version > 0 else None,
+    ) if set_id else None
+    if outfit_set:
+        result["outfit_set_name"] = str(outfit_set.get("name") or "")
+        result["outfit_set_version"] = int(outfit_set.get("version") or 0)
+        result["outfit_set_content_hash"] = str(
+            outfit_set.get("content_hash") or ""
+        )
+        result["outfit_set_prompt"] = str(outfit_set.get("prompt") or "")
+        result["outfit_set_rating"] = str(outfit_set.get("rating") or "普通")
+        result["outfit_set_items"] = outfit_set.get("items") or []
+        result["outfit_set_missing"] = False
+    else:
+        result["outfit_set_name"] = ""
+        result["outfit_set_content_hash"] = ""
+        result["outfit_set_prompt"] = ""
+        result["outfit_set_rating"] = ""
+        result["outfit_set_items"] = []
+        result["outfit_set_missing"] = bool(set_id)
+    if outfit_set and content_restriction_enabled() and outfit_set.get("rating") == "R18":
+        result["outfit_set_restricted"] = True
+        result["outfit_set_name"] = ""
+        result["outfit_set_prompt"] = ""
+        result["outfit_set_items"] = []
+    else:
+        result["outfit_set_restricted"] = False
     return result
 
 _TRACKING_QUERY_KEYS = {
@@ -1109,6 +1139,47 @@ def outfit_preset_detail(
     return {"item": item}
 
 
+@router.get("/api/prompt-agent/outfit-presets/{preset_id}/versions")
+def outfit_preset_versions(preset_id: str) -> dict:
+    """Return immutable set versions for comparison and rollback."""
+    items = database.list_outfit_preset_versions(preset_id)
+    if not items:
+        raise HTTPException(status_code=404, detail="套装不存在")
+    if content_restriction_enabled() and any(
+        item.get("rating") == "R18" for item in items
+    ):
+        raise HTTPException(status_code=404, detail="套装不存在")
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/api/prompt-agent/outfit-presets/{preset_id}/rollback")
+def rollback_outfit_preset_api(
+    preset_id: str,
+    payload: dict = Body(...),
+) -> dict:
+    """Restore a historical set by appending a new version."""
+    try:
+        version = int(payload.get("version") or 0)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="version 格式不正确") from exc
+    if version < 1:
+        raise HTTPException(status_code=400, detail="version 必须大于 0")
+    target = database.get_outfit_preset(preset_id, version)
+    if not target:
+        raise HTTPException(status_code=404, detail="套装或历史版本不存在")
+    if content_restriction_enabled() and target.get("rating") == "R18":
+        raise HTTPException(status_code=404, detail="套装不存在")
+    try:
+        item = database.rollback_outfit_preset(preset_id, version)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="套装或历史版本不存在") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"item": item}
+
+
 @router.post("/api/prompt-agent/outfit-presets/{preset_id}/duplicate")
 def duplicate_outfit_preset(
     preset_id: str,
@@ -1156,6 +1227,8 @@ def delete_outfit_preset_api(preset_id: str) -> dict:
     try:
         deleted = database.delete_outfit_preset(preset_id)
     except PermissionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="套装不存在")
@@ -1261,6 +1334,22 @@ def _validate_appearance_preset_payload(payload: dict, *, partial: bool = False)
     outfit_id = str(payload.get("outfit_id") or "").strip()
     if len(outfit_id) > 160:
         raise HTTPException(status_code=400, detail="outfit_id 过长")
+    outfit_set_id = str(payload.get("outfit_set_id") or "").strip()
+    if len(outfit_set_id) > 160:
+        raise HTTPException(status_code=400, detail="outfit_set_id 过长")
+    raw_outfit_set_version = payload.get("outfit_set_version")
+    try:
+        outfit_set_version = int(raw_outfit_set_version or 0)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="outfit_set_version 格式不正确",
+        ) from exc
+    if outfit_set_version < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="outfit_set_version 不能为负数",
+        )
     return {
         "name": name,
         "work": work,
@@ -1269,9 +1358,49 @@ def _validate_appearance_preset_payload(payload: dict, *, partial: bool = False)
         "clothing_tags": clean_tags("clothing_tags"),
         "expression_tags": clean_tags("expression_tags"),
         "outfit_id": outfit_id,
+        "outfit_set_id": outfit_set_id,
+        "outfit_set_version": outfit_set_version,
         "note": note,
         "enabled": payload.get("enabled", True) is not False,
     }
+
+
+def _resolve_appearance_outfit_set(
+    payload: dict,
+    values: dict,
+    current: dict | None = None,
+) -> tuple[str, int]:
+    """Resolve an optional set association to one immutable set version."""
+    if (
+        "outfit_set_id" not in payload
+        and "outfit_set_version" not in payload
+        and current is not None
+    ):
+        return current["outfit_set_id"], int(current["outfit_set_version"] or 0)
+    preset_id = (
+        values["outfit_set_id"]
+        if "outfit_set_id" in payload
+        else str((current or {}).get("outfit_set_id") or "")
+    )
+    requested_version = (
+        int(values["outfit_set_version"])
+        if "outfit_set_version" in payload
+        else 0
+    )
+    if not preset_id:
+        return "", 0
+    outfit_set = database.get_outfit_preset(
+        preset_id,
+        requested_version if requested_version > 0 else None,
+    )
+    if not outfit_set:
+        raise HTTPException(status_code=400, detail="默认服装套装或版本不存在")
+    if content_restriction_enabled() and outfit_set.get("rating") == "R18":
+        raise HTTPException(
+            status_code=403,
+            detail="内容限制已开启，不能关联 R18 默认服装套装",
+        )
+    return preset_id, int(outfit_set["version"])
 
 
 @router.get("/api/prompt-agent/appearance-presets")
@@ -1319,6 +1448,9 @@ def appearance_preset_detail(
 @router.post("/api/prompt-agent/appearance-presets")
 def create_appearance_preset(payload: dict = Body(...)) -> dict:
     values = _validate_appearance_preset_payload(payload)
+    values["outfit_set_id"], values["outfit_set_version"] = (
+        _resolve_appearance_outfit_set(payload, values)
+    )
     preset_id = str(payload.get("preset_id") or "").strip()
     if preset_id:
         if not re.fullmatch(r"[A-Za-z0-9_-]{3,80}", preset_id):
@@ -1341,6 +1473,11 @@ def edit_appearance_preset(preset_id: str, payload: dict = Body(...)) -> dict:
     if not current:
         raise HTTPException(status_code=404, detail="外观预设不存在")
     values = _validate_appearance_preset_payload(payload, partial=True)
+    outfit_set_id, outfit_set_version = _resolve_appearance_outfit_set(
+        payload,
+        values,
+        current,
+    )
     merged = {
         "name": values["name"] or current["name"],
         "work": values["work"] if "work" in payload else current["work"],
@@ -1355,6 +1492,8 @@ def edit_appearance_preset(preset_id: str, payload: dict = Body(...)) -> dict:
             values["expression_tags"] if "expression_tags" in payload else current["expression_tags"]
         ),
         "outfit_id": values["outfit_id"] if "outfit_id" in payload else current["outfit_id"],
+        "outfit_set_id": outfit_set_id,
+        "outfit_set_version": outfit_set_version,
         "note": values["note"] if "note" in payload else current["note"],
         "enabled": values["enabled"] if "enabled" in payload else current["enabled"],
     }
@@ -1387,6 +1526,8 @@ def duplicate_appearance_preset(preset_id: str, payload: dict = Body(default={})
         clothing_tags=current["clothing_tags"],
         expression_tags=current["expression_tags"],
         outfit_id=current["outfit_id"],
+        outfit_set_id=current["outfit_set_id"],
+        outfit_set_version=current["outfit_set_version"],
         note=current["note"],
         source="user",
         enabled=current["enabled"],
@@ -1420,6 +1561,27 @@ def apply_appearance_preset(preset_id: str, payload: dict = Body(default={})) ->
     if not current:
         raise HTTPException(status_code=404, detail="外观预设不存在")
     current = _appearance_with_outfit(current)
+    if current.get("outfit_set_restricted"):
+        raise HTTPException(
+            status_code=403,
+            detail="内容限制已开启，不能应用 R18 默认服装套装",
+        )
+    if current.get("outfit_set_missing"):
+        raise HTTPException(
+            status_code=409,
+            detail="默认服装套装或固定版本已不存在，请重新关联",
+        )
+    default_outfit_set = None
+    if current.get("outfit_set_id"):
+        default_outfit_set = {
+            "preset_id": current["outfit_set_id"],
+            "version": current["outfit_set_version"],
+            "name": current["outfit_set_name"],
+            "content_hash": current["outfit_set_content_hash"],
+            "prompt": current["outfit_set_prompt"],
+            "rating": current["outfit_set_rating"],
+            "items": current["outfit_set_items"],
+        }
     return {
         "preset_ref": {
             "preset_id": current["preset_id"],
@@ -1433,6 +1595,10 @@ def apply_appearance_preset(preset_id: str, payload: dict = Body(default={})) ->
             "expression_tags": current["expression_tags"],
             "outfit_id": current["outfit_id"],
             "outfit_name": current["outfit_name"],
+            "outfit_set_id": current["outfit_set_id"],
+            "outfit_set_version": current["outfit_set_version"],
+            "outfit_set_name": current["outfit_set_name"],
+            "outfit_set_content_hash": current["outfit_set_content_hash"],
             "note": current["note"],
         },
         "appearance": current["appearance_tags"],
@@ -1440,6 +1606,7 @@ def apply_appearance_preset(preset_id: str, payload: dict = Body(default={})) ->
         "expression": current["expression_tags"],
         "default_outfit_id": current["outfit_id"],
         "default_outfit_name": current["outfit_name"],
+        "default_outfit_set": default_outfit_set,
     }
 
 

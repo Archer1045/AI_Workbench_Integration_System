@@ -238,6 +238,8 @@ CREATE TABLE IF NOT EXISTS character_appearance_presets (
     clothing_tags TEXT NOT NULL DEFAULT '[]',
             expression_tags TEXT NOT NULL DEFAULT '[]',
             outfit_id TEXT NOT NULL DEFAULT '',
+            outfit_set_id TEXT NOT NULL DEFAULT '',
+            outfit_set_version INTEGER NOT NULL DEFAULT 0,
             note TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT 'user',
     version INTEGER NOT NULL DEFAULT 1,
@@ -257,6 +259,8 @@ CREATE INDEX IF NOT EXISTS idx_character_appearance_presets_lookup
     ON character_appearance_presets(preset_id, version);
 CREATE INDEX IF NOT EXISTS idx_character_appearance_presets_filter
     ON character_appearance_presets(category, source, enabled);
+CREATE INDEX IF NOT EXISTS idx_character_appearance_presets_outfit_set
+    ON character_appearance_presets(outfit_set_id, version);
 CREATE TABLE IF NOT EXISTS outfit_presets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     preset_id TEXT NOT NULL,
@@ -304,7 +308,7 @@ _TABLES = {
 }
 
 # SQLite 版本化迁移：新库与旧库都从 user_version=0 开始依次执行。
-SCHEMA_VERSION = 32
+SCHEMA_VERSION = 33
 
 
 def get_connection() -> sqlite3.Connection:
@@ -1168,6 +1172,27 @@ def _migration_032_outfit_sets(conn: sqlite3.Connection) -> None:
     _seed_builtin_outfit_presets(conn)
 
 
+def _migration_033_character_outfit_set_links(conn: sqlite3.Connection) -> None:
+    """Link appearance presets to an immutable outfit-set version."""
+    columns = _table_columns(conn, "character_appearance_presets")
+    if "outfit_set_id" not in columns:
+        conn.execute(
+            "ALTER TABLE character_appearance_presets "
+            "ADD COLUMN outfit_set_id TEXT NOT NULL DEFAULT ''"
+        )
+    if "outfit_set_version" not in columns:
+        conn.execute(
+            "ALTER TABLE character_appearance_presets "
+            "ADD COLUMN outfit_set_version INTEGER NOT NULL DEFAULT 0"
+        )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_character_appearance_presets_outfit_set
+        ON character_appearance_presets(outfit_set_id, version)
+        """
+    )
+
+
 _MIGRATIONS = (
     _migration_001_compat,
     _migration_002_background_jobs,
@@ -1201,6 +1226,7 @@ _MIGRATIONS = (
     _migration_030_builtin_character_outfit_resync,
     _migration_031_character_visual_corrections,
     _migration_032_outfit_sets,
+    _migration_033_character_outfit_set_links,
 )
 
 
@@ -2921,6 +2947,8 @@ def _appearance_preset_row(row: sqlite3.Row) -> dict:
         "clothing_tags": _decode_json_tags(data["clothing_tags"]),
         "expression_tags": _decode_json_tags(data["expression_tags"]),
         "outfit_id": str(data.get("outfit_id") or ""),
+        "outfit_set_id": str(data.get("outfit_set_id") or ""),
+        "outfit_set_version": int(data.get("outfit_set_version") or 0),
         "note": str(data["note"] or ""),
         "source": str(data["source"] or "user"),
         "version": int(data["version"] or 1),
@@ -2951,10 +2979,11 @@ def list_character_appearance_presets(
     if keyword.strip():
         like = f"%{keyword.strip()}%"
         clauses.append(
-            "(p.name LIKE ? OR p.work LIKE ? OR p.outfit_id LIKE ? OR p.note LIKE ? "
+            "(p.name LIKE ? OR p.work LIKE ? OR p.outfit_id LIKE ? "
+            "OR p.outfit_set_id LIKE ? OR p.note LIKE ? "
             "OR p.appearance_tags LIKE ? OR p.clothing_tags LIKE ? OR p.expression_tags LIKE ?)"
         )
-        params.extend([like, like, like, like, like, like, like])
+        params.extend([like, like, like, like, like, like, like, like])
     if category.strip():
         clauses.append("p.category = ?")
         params.append(category.strip())
@@ -3035,6 +3064,8 @@ def create_character_appearance_preset(
     clothing_tags,
     expression_tags,
     outfit_id: str = "",
+    outfit_set_id: str = "",
+    outfit_set_version: int = 0,
     note: str = "",
     source: str = "user",
     enabled: bool = True,
@@ -3045,9 +3076,9 @@ def create_character_appearance_preset(
             """
             INSERT INTO character_appearance_presets (
                 preset_id, name, work, category, appearance_tags, clothing_tags,
-                expression_tags, outfit_id, note, source, version, enabled,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+                expression_tags, outfit_id, outfit_set_id, outfit_set_version,
+                note, source, version, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
             """,
             (
                 preset_id,
@@ -3058,6 +3089,8 @@ def create_character_appearance_preset(
                 json.dumps(_tag_values(clothing_tags), ensure_ascii=False),
                 json.dumps(_tag_values(expression_tags), ensure_ascii=False),
                 str(outfit_id or "").strip(),
+                str(outfit_set_id or "").strip(),
+                int(outfit_set_version or 0),
                 note,
                 source,
                 1 if enabled else 0,
@@ -3083,6 +3116,8 @@ def update_character_appearance_preset(
     clothing_tags,
     expression_tags,
     outfit_id: str = "",
+    outfit_set_id: str = "",
+    outfit_set_version: int = 0,
     note: str = "",
     source: str = "user",
     enabled: bool = True,
@@ -3098,9 +3133,9 @@ def update_character_appearance_preset(
             """
             INSERT INTO character_appearance_presets (
                 preset_id, name, work, category, appearance_tags, clothing_tags,
-                expression_tags, outfit_id, note, source, version, enabled,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                expression_tags, outfit_id, outfit_set_id, outfit_set_version,
+                note, source, version, enabled, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 preset_id,
@@ -3111,6 +3146,8 @@ def update_character_appearance_preset(
                 json.dumps(_tag_values(clothing_tags), ensure_ascii=False),
                 json.dumps(_tag_values(expression_tags), ensure_ascii=False),
                 str(outfit_id or "").strip(),
+                str(outfit_set_id or "").strip(),
+                int(outfit_set_version or 0),
                 note,
                 source,
                 next_version,
@@ -3435,6 +3472,23 @@ def get_outfit_preset(
         return _outfit_preset_row(row, _outfit_item_rows(conn, int(row["id"])))
 
 
+def list_outfit_preset_versions(preset_id: str) -> list[dict]:
+    """Return every immutable saved version of one outfit preset."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM outfit_presets
+            WHERE preset_id = ?
+            ORDER BY version DESC, id DESC
+            """,
+            (preset_id,),
+        ).fetchall()
+        return [
+            _outfit_preset_row(row, _outfit_item_rows(conn, int(row["id"])))
+            for row in rows
+        ]
+
+
 def create_outfit_preset(
     normalized: dict,
     *,
@@ -3491,12 +3545,62 @@ def update_outfit_preset(
     return preset
 
 
+def rollback_outfit_preset(preset_id: str, version: int) -> dict:
+    """Append a new version copied from a historical version."""
+    current = get_outfit_preset(preset_id)
+    if not current:
+        raise KeyError(preset_id)
+    if current["source"] != "user":
+        raise PermissionError("内置套装只能另存为副本")
+    if int(current["version"]) == int(version):
+        raise ValueError("已经是最新版本")
+    target = get_outfit_preset(preset_id, int(version))
+    if not target:
+        raise KeyError(f"{preset_id}@{version}")
+    with get_connection() as conn:
+        next_version = int(current["version"]) + 1
+        row_id = _insert_outfit_row(
+            conn,
+            preset_id=preset_id,
+            normalized=target,
+            source="user",
+            version=next_version,
+        )
+    preset = get_outfit_preset(preset_id, next_version)
+    if not preset or preset["row_id"] != row_id:
+        raise RuntimeError("套装回滚后读取失败")
+    return preset
+
+
+def count_outfit_set_references(preset_id: str) -> dict:
+    """Count appearance preset versions pinned to an outfit set."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS version_count,
+                   COUNT(DISTINCT p.preset_id) AS preset_count
+            FROM character_appearance_presets p
+            WHERE p.outfit_set_id = ?
+            """,
+            (preset_id,),
+        ).fetchone()
+    return {
+        "versions": int(row["version_count"] if row else 0),
+        "presets": int(row["preset_count"] if row else 0),
+    }
+
+
 def delete_outfit_preset(preset_id: str) -> int:
     current = get_outfit_preset(preset_id)
     if not current:
         return 0
     if current["source"] != "user":
         raise PermissionError("内置套装不能删除")
+    references = count_outfit_set_references(preset_id)
+    if references["versions"]:
+        raise ValueError(
+            f"套装仍被 {references['presets']} 个角色外观预设引用，请先解除关联"
+        )
     with get_connection() as conn:
         cursor = conn.execute(
             "DELETE FROM outfit_presets WHERE preset_id = ?",

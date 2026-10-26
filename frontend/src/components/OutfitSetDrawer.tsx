@@ -3,6 +3,7 @@ import {
   ArrowUpOutlined,
   CopyOutlined,
   DeleteOutlined,
+  HistoryOutlined,
   PlusOutlined,
   ReloadOutlined,
   SaveOutlined,
@@ -33,6 +34,7 @@ import {
   type OutfitSetDefinition,
   type OutfitSetPreset,
   type OutfitSlot,
+  type OutfitSetVersionCatalog,
 } from '../api';
 import {
   defaultOutfitCovers,
@@ -139,6 +141,10 @@ export default function OutfitSetDrawer({
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [applyScope, setApplyScope] = useState<OutfitApplyScope>('current');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [versions, setVersions] = useState<OutfitSetPreset[]>([]);
+  const [rollingBackVersion, setRollingBackVersion] = useState(0);
 
   const clothingMap = useMemo(
     () => new Map(clothing.map((item) => [item.id, item])),
@@ -441,6 +447,55 @@ export default function OutfitSetDrawer({
       message.error(errorDetail(error));
     } finally {
       setPreviewing(false);
+    }
+  };
+
+  const loadVersions = async () => {
+    if (!selected) return;
+    setHistoryLoading(true);
+    try {
+      const { data } = await api.get<OutfitSetVersionCatalog>(
+        `/prompt-agent/outfit-presets/${encodeURIComponent(selected.preset_id)}/versions`,
+      );
+      setVersions(data.items || []);
+    } catch (error: unknown) {
+      setVersions([]);
+      message.error(errorDetail(error));
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openHistory = () => {
+    if (!selected || selected.source !== 'user') return;
+    if (dirty) {
+      message.warning('请先保存或放弃当前修改，再查看历史版本');
+      return;
+    }
+    setHistoryOpen(true);
+    void loadVersions();
+  };
+
+  const rollback = async (version: number) => {
+    if (!selected) return;
+    setRollingBackVersion(version);
+    try {
+      const { data } = await api.post<{ item: OutfitSetPreset }>(
+        `/prompt-agent/outfit-presets/${encodeURIComponent(selected.preset_id)}/rollback`,
+        { version },
+      );
+      const restored = data.item;
+      setOutfits((current) => [
+        restored,
+        ...current.filter((item) => item.preset_id !== restored.preset_id),
+      ]);
+      selectDraft(restored);
+      await loadVersions();
+      message.success(`已从 v${version} 恢复为新的 v${restored.version}`);
+    } catch (error: unknown) {
+      message.error(errorDetail(error));
+    } finally {
+      setRollingBackVersion(0);
     }
   };
 
@@ -820,6 +875,13 @@ export default function OutfitSetDrawer({
                   >
                     复制
                   </Button>
+                  <Button
+                    icon={<HistoryOutlined />}
+                    disabled={selected?.source !== 'user' || dirty}
+                    onClick={openHistory}
+                  >
+                    历史版本
+                  </Button>
                   <Popconfirm
                     title="删除这个用户套装？"
                     description="历史版本和逐件快照会一并删除，但不会改动已写入提示词的角色。"
@@ -900,6 +962,67 @@ export default function OutfitSetDrawer({
           onChange={(event) => setSaveName(event.target.value)}
           placeholder="套装名称"
           onPressEnter={() => void save()}
+        />
+      </Modal>
+      <Modal
+        title={`历史版本 · ${selected?.name || ''}`}
+        open={historyOpen}
+        footer={null}
+        width={760}
+        onCancel={() => setHistoryOpen(false)}
+      >
+        <Alert
+          type="info"
+          showIcon
+          message="回滚不会删除历史版本"
+          description="恢复操作会把所选旧版本复制为新的最新版本；角色预设仍固定引用各自保存时选择的版本。"
+          style={{ marginBottom: 12 }}
+        />
+        <List
+          loading={historyLoading}
+          dataSource={versions}
+          locale={{ emptyText: '暂无历史版本' }}
+          renderItem={(item) => (
+            <List.Item
+              actions={[
+                <Popconfirm
+                  key={`rollback-${item.version}`}
+                  title={`从 v${item.version} 恢复？`}
+                  description="将追加一个新的最新版本，历史记录保留。"
+                  disabled={item.version === selected?.version}
+                  onConfirm={() => void rollback(item.version)}
+                >
+                  <Button
+                    size="small"
+                    disabled={item.version === selected?.version}
+                    loading={rollingBackVersion === item.version}
+                  >
+                    {item.version === selected?.version ? '当前版本' : '恢复此版本'}
+                  </Button>
+                </Popconfirm>,
+              ]}
+            >
+              <List.Item.Meta
+                title={
+                  <Space wrap>
+                    <Tag color={item.version === selected?.version ? 'green' : 'default'}>
+                      v{item.version}
+                    </Tag>
+                    <strong>{item.name}</strong>
+                    <Tag>{item.items.length} 件</Tag>
+                  </Space>
+                }
+                description={
+                  <div>
+                    <div>{item.prompt}</div>
+                    <div className="help">
+                      {item.updated_at} · hash {item.content_hash.slice(0, 12)}
+                    </div>
+                  </div>
+                }
+              />
+            </List.Item>
+          )}
         />
       </Modal>
     </>

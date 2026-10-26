@@ -1018,6 +1018,15 @@ export interface CharacterAppearancePreset {
   expression_tags: string[];
   outfit_id: string;
   outfit_name?: string;
+  outfit_set_id: string;
+  outfit_set_version: number;
+  outfit_set_name?: string;
+  outfit_set_content_hash?: string;
+  outfit_set_prompt?: string;
+  outfit_set_rating?: string;
+  outfit_set_items?: StoredOutfitItem[];
+  outfit_set_missing?: boolean;
+  outfit_set_restricted?: boolean;
   note: string;
   source: 'builtin' | 'user' | 'llm_draft' | 'legacy_cache' | string;
   version: number;
@@ -1049,6 +1058,10 @@ export interface CharacterAppearancePresetApplyResult {
     expression_tags: string[];
     outfit_id: string;
     outfit_name?: string;
+    outfit_set_id: string;
+    outfit_set_version: number;
+    outfit_set_name?: string;
+    outfit_set_content_hash?: string;
     note: string;
   };
   appearance: string[];
@@ -1056,6 +1069,7 @@ export interface CharacterAppearancePresetApplyResult {
   expression: string[];
   default_outfit_id: string;
   default_outfit_name?: string;
+  default_outfit_set: AppliedOutfitSet | null;
 }
 
 export interface BatchJob {
@@ -1222,6 +1236,12 @@ export interface OutfitSetDefinition {
   items: Array<OutfitItemDraft | StoredOutfitItem>;
 }
 
+export interface AppliedOutfitSet extends OutfitSetDefinition {
+  preset_id: string;
+  version: number;
+  content_hash: string;
+}
+
 export interface OutfitSetPreset {
   id: string;
   row_id: number;
@@ -1255,6 +1275,11 @@ export interface OutfitSetCatalog {
   max_items: number;
   restricted: boolean;
   schema_version: number;
+}
+
+export interface OutfitSetVersionCatalog {
+  items: OutfitSetPreset[];
+  total: number;
 }
 
 export interface ScenePreset extends PresetTaxonomyFields {

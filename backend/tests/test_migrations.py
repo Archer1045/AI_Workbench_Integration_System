@@ -50,6 +50,13 @@ def test_migrations_idempotent(tmp_path, monkeypatch):
         for row in database.get_connection().execute("PRAGMA table_info(prompt_sets)").fetchall()
     }
     assert "composition_json" in prompt_columns
+    appearance_columns = {
+        row["name"]
+        for row in database.get_connection()
+        .execute("PRAGMA table_info(character_appearance_presets)")
+        .fetchall()
+    }
+    assert {"outfit_set_id", "outfit_set_version"} <= appearance_columns
     draw_columns = {
         row["name"]
         for row in database.get_connection().execute("PRAGMA table_info(draw_records)").fetchall()

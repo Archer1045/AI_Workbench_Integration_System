@@ -9,6 +9,7 @@ import {
   SaveOutlined,
 } from '@ant-design/icons';
 import {
+  Alert,
   Button,
   Image,
   Input,
@@ -26,9 +27,12 @@ import {
 import { useEffect, useState } from 'react';
 import {
   api,
+  type AppliedOutfitSet,
   type CharacterAppearancePreset,
   type CharacterAppearancePresetApplyResult,
   type CharacterAppearancePresetList,
+  type OutfitSetCatalog,
+  type OutfitSetVersionCatalog,
 } from '../api';
 import type { PresetAssetSelection } from '../stores/presetAssetStore';
 import ClothingPresetsModal from './ClothingPresetsModal';
@@ -57,6 +61,7 @@ export interface CharacterAppearanceResult {
   corrected?: boolean;
   default_outfit_id?: string;
   default_outfit_name?: string;
+  default_outfit_set?: AppliedOutfitSet | null;
   preset_ref?: { preset_id: string; version: number };
   snapshot?: Record<string, unknown>;
 }
@@ -126,6 +131,13 @@ export default function CharacterAppearanceModal({
   const [presetClothing, setPresetClothing] = useState('');
   const [presetExpression, setPresetExpression] = useState('');
   const [presetOutfitId, setPresetOutfitId] = useState('');
+  const [presetOutfitSetId, setPresetOutfitSetId] = useState('');
+  const [presetOutfitSetVersion, setPresetOutfitSetVersion] = useState(0);
+  const [outfitSets, setOutfitSets] = useState<OutfitSetCatalog['items']>([]);
+  const [outfitSetVersions, setOutfitSetVersions] = useState<
+    OutfitSetVersionCatalog['items']
+  >([]);
+  const [outfitSetLoading, setOutfitSetLoading] = useState(false);
   const [presetNote, setPresetNote] = useState('');
   const [presetEnabled, setPresetEnabled] = useState(true);
 
@@ -182,6 +194,39 @@ export default function CharacterAppearanceModal({
     setNoteText('');
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    api
+      .get<OutfitSetCatalog>('/prompt-agent/outfit-presets')
+      .then((response) => setOutfitSets(response.data.items || []))
+      .catch(() => setOutfitSets([]));
+  }, [open]);
+
+  useEffect(() => {
+    if (!editorOpen || !presetOutfitSetId) {
+      setOutfitSetVersions([]);
+      return;
+    }
+    let cancelled = false;
+    setOutfitSetLoading(true);
+    api
+      .get<OutfitSetVersionCatalog>(
+        `/prompt-agent/outfit-presets/${encodeURIComponent(presetOutfitSetId)}/versions`,
+      )
+      .then((response) => {
+        if (!cancelled) setOutfitSetVersions(response.data.items || []);
+      })
+      .catch(() => {
+        if (!cancelled) setOutfitSetVersions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setOutfitSetLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editorOpen, presetOutfitSetId]);
+
   const openCreate = () => {
     setEditingPreset(null);
     setPresetName('');
@@ -191,6 +236,8 @@ export default function CharacterAppearanceModal({
     setPresetClothing('');
     setPresetExpression('');
     setPresetOutfitId('');
+    setPresetOutfitSetId('');
+    setPresetOutfitSetVersion(0);
     setPresetNote('');
     setPresetEnabled(true);
     setEditorOpen(true);
@@ -205,6 +252,8 @@ export default function CharacterAppearanceModal({
     setPresetClothing(item.clothing_tags.join(', '));
     setPresetExpression(item.expression_tags.join(', '));
     setPresetOutfitId(item.outfit_id || '');
+    setPresetOutfitSetId(item.outfit_set_id || '');
+    setPresetOutfitSetVersion(item.outfit_set_version || 0);
     setPresetNote(item.note);
     setPresetEnabled(item.enabled);
     setEditorOpen(true);
@@ -224,6 +273,8 @@ export default function CharacterAppearanceModal({
       clothing_tags: parseTags(presetClothing),
       expression_tags: parseTags(presetExpression),
       outfit_id: presetOutfitId.trim(),
+      outfit_set_id: presetOutfitSetId,
+      outfit_set_version: presetOutfitSetVersion,
       note: presetNote.trim(),
       enabled: presetEnabled,
     };
@@ -562,7 +613,12 @@ export default function CharacterAppearanceModal({
                       <span className="setting-label" style={{ marginBottom: 0 }}>
                         默认服装：
                       </span>
-                      {item.outfit_name || item.outfit_id || '未关联'}
+                      {item.outfit_set_name
+                        ? `套装「${item.outfit_set_name}」v${item.outfit_set_version}`
+                        : item.outfit_name || item.outfit_id || '未关联'}
+                      {item.outfit_set_missing ? (
+                        <Tag color="red">套装版本已失效</Tag>
+                      ) : null}
                     </div>
                     <div>
                       <span className="setting-label" style={{ marginBottom: 0 }}>
@@ -768,12 +824,54 @@ export default function CharacterAppearanceModal({
             <Input.TextArea rows={2} value={presetClothing} onChange={(event) => setPresetClothing(event.target.value)} />
           </div>
           <div className="setting-field">
-            <span className="setting-label">默认服装预设 ID</span>
+            <span className="setting-label">默认单品服装 ID（原子服装）</span>
             <Input
               value={presetOutfitId}
               onChange={(event) => setPresetOutfitId(event.target.value)}
               placeholder="例如 outfit_genshin_columbina_default"
             />
+          </div>
+          <Alert
+            type="info"
+            showIcon
+            message="默认服装套装与原子服装分开保存"
+            description="关联套装后会固定到具体版本，并在应用角色预设时作为结构化服装块写入；原子服装 ID 仍保留，不会被覆盖或改写。"
+          />
+          <div className="setting-field">
+            <span className="setting-label">默认服装套装（可选）</span>
+            <Space.Compact style={{ width: '100%' }}>
+              <Select
+                allowClear
+                showSearch
+                value={presetOutfitSetId || undefined}
+                placeholder="搜索并选择套装"
+                optionFilterProp="label"
+                style={{ flex: 1 }}
+                options={outfitSets.map((item) => ({
+                  label: `${item.name} · ${item.category} · v${item.version}`,
+                  value: item.preset_id,
+                }))}
+                onChange={(value) => {
+                  const selected = outfitSets.find(
+                    (item) => item.preset_id === value,
+                  );
+                  setPresetOutfitSetId(value || '');
+                  setPresetOutfitSetVersion(selected?.version || 0);
+                }}
+              />
+              <Select
+                value={presetOutfitSetVersion || undefined}
+                placeholder="版本"
+                loading={outfitSetLoading}
+                disabled={!presetOutfitSetId}
+                style={{ width: 150 }}
+                options={outfitSetVersions.map((item) => ({
+                  label: `v${item.version} · ${item.name}`,
+                  value: item.version,
+                }))}
+                onChange={(value) => setPresetOutfitSetVersion(Number(value))}
+              />
+            </Space.Compact>
           </div>
           <div className="setting-field">
             <span className="setting-label">表情标签</span>

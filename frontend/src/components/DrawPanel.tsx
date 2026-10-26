@@ -1463,7 +1463,10 @@ export default function DrawPanel({
     const target =
       drawStore.groups.find((group) => group.id === activeGroupId) || drawStore.groups[0];
     const result = apply.result;
-    const tags = mergeTags(mergeTags(result.appearance, result.clothing), result.expression);
+    const clothingTags = result.default_outfit_set
+      ? [result.default_outfit_set.prompt || '']
+      : result.clothing;
+    const tags = mergeTags(mergeTags(result.appearance, clothingTags), result.expression);
     if (!target) {
       const group = createDrawGroup('', 'group-character-appearance', 'structured');
       drawStore.groups = [group];
@@ -1480,7 +1483,7 @@ export default function DrawPanel({
     } else {
       updateDocument(resolvedTarget.id, (document) => {
         const targetIds = resolveCharacterTargets(document, activeCharacterId, apply.scope);
-        return targetIds.reduce((next, characterId) => {
+        const withAppearance = targetIds.reduce((next, characterId) => {
           if (result.preset_ref) {
             return applyAppearancePresetToCharacter(next, characterId, result);
           }
@@ -1501,6 +1504,13 @@ export default function DrawPanel({
           }));
           return updated;
         }, document);
+        if (!result.default_outfit_set) return withAppearance;
+        return applyOutfitSetToDocument(
+          withAppearance,
+          result.default_outfit_set,
+          activeCharacterId,
+          apply.scope,
+        );
       });
     }
     message.success(apply.scope === 'all' ? '已写入全部角色' : '已写入当前角色');
