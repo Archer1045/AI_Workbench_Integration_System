@@ -164,10 +164,7 @@ describe('outfit set helpers', () => {
       'black shoes',
     ]);
     expect(applied.characters[0].clothing.source).toBe('outfit_set');
-    expect(applied.characters[0].clothing.preset_refs[0]).toEqual({
-      preset_id: 'outfit_set:outfit_test',
-      version: 3,
-    });
+    expect(applied.characters[0].clothing.preset_refs).toEqual([]);
     expect(
       (applied.characters[0].clothing.preset_snapshot as {
         outfit_set: { content_hash: string };

@@ -23,6 +23,7 @@ def _payload(**overrides):
 
 def test_builtin_outfit_catalog_is_valid() -> None:
     assert 10 <= len(outfit_sets.BUILTIN_OUTFITS) <= 20
+    assert sum(len(item["items"]) for item in outfit_sets.BUILTIN_OUTFITS) == 41
     ids = [item["preset_id"] for item in outfit_sets.BUILTIN_OUTFITS]
     assert len(ids) == len(set(ids))
     for item in outfit_sets.BUILTIN_OUTFITS:

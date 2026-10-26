@@ -127,14 +127,6 @@ export function applyOutfitSetToDocument(
       ),
     ]),
   );
-  const itemRefs = items.map((item) => ({
-    preset_id: `outfit_item:${item.clothing_id}`,
-    version: item.clothing_version || 1,
-  }));
-  const outfitRef = {
-    preset_id: `outfit_set:${outfit.preset_id || outfit.name}`,
-    version: outfit.version || 1,
-  };
   const targetIds = resolveCharacterTargets(document, activeCharacterId, scope);
 
   return targetIds.reduce(
@@ -142,16 +134,10 @@ export function applyOutfitSetToDocument(
       updateCharacterBlock(next, characterId, 'clothing', (block) => ({
         ...block,
         tags: clothingTags,
-        preset_refs: [outfitRef, ...itemRefs],
-        footwear: createPromptBlock(
-          'footwear',
-          footwearTags,
-          itemRefs.filter((ref) =>
-            footwearItems.some(
-              (item) => ref.preset_id === `outfit_item:${item.clothing_id}`,
-            ),
-          ),
-        ),
+        // Outfit metadata lives in preset_snapshot. Generic preset_refs are
+        // resolved as atomic catalog IDs by the backend and reject `outfit_*`.
+        preset_refs: [],
+        footwear: createPromptBlock('footwear', footwearTags),
         preset_snapshot: {
           ...block.preset_snapshot,
           outfit_set: {
