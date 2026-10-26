@@ -73,9 +73,24 @@ class SourceDiscoverIngestRequest(BaseModel):
 
 
 
+class SourceImageContext(BaseModel):
+    image_id: str
+    url: str
+    paragraph_index: int = 0
+    section: str = ""
+    caption: str = ""
+    width: int = 0
+    height: int = 0
+
+
 class SourceImageAsset(BaseModel):
     image_id: str
     url: str
+    paragraph_index: int = 0
+    section: str = ""
+    caption: str = ""
+    width: int = 0
+    height: int = 0
     local_path: str = ""
     mime_type: str = ""
     byte_size: int = 0
@@ -132,6 +147,7 @@ class SourceSnapshot(BaseModel):
     excerpt: str
     text: str
     images: list[str] = Field(default_factory=list)
+    image_contexts: list[SourceImageContext] = Field(default_factory=list)
     image_assets: list[SourceImageAsset] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     event_id: str | None = None

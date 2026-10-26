@@ -142,6 +142,7 @@ export interface SourceRecord {
   excerpt: string;
   text: string;
   images: string[];
+  image_contexts: SourceImageContext[];
   image_assets: SourceImageAsset[];
   warnings: string[];
   event_id: string | null;
@@ -414,6 +415,11 @@ export async function saveCombatAssumptions(payload: CombatAssumptions): Promise
 export interface SourceImageAsset {
   image_id: string;
   url: string;
+  paragraph_index: number;
+  section: string;
+  caption: string;
+  width: number;
+  height: number;
   local_path: string;
   mime_type: string;
   byte_size: number;
@@ -424,6 +430,16 @@ export interface SourceImageAsset {
   analysis_text: string;
   analysis_facts: Array<Record<string, unknown>>;
   analysis_error: string;
+}
+
+export interface SourceImageContext {
+  image_id: string;
+  url: string;
+  paragraph_index: number;
+  section: string;
+  caption: string;
+  width: number;
+  height: number;
 }
 
 export interface SourceImagePrepareResult {
@@ -448,8 +464,15 @@ export async function prepareSourceImages(sourceId: string): Promise<SourceImage
   return data;
 }
 
-export async function analyzeSourceImages(sourceId: string, model = ''): Promise<SourceImageAnalysisResult> {
-  const { data } = await api.post<SourceImageAnalysisResult>('/game-assistant/fgo/sources/' + sourceId + '/images/analyze', { model });
+export async function analyzeSourceImages(
+  sourceId: string,
+  model = '',
+  retryFailedOnly = false,
+): Promise<SourceImageAnalysisResult> {
+  const { data } = await api.post<SourceImageAnalysisResult>(
+    '/game-assistant/fgo/sources/' + sourceId + '/images/analyze',
+    { model, retry_failed_only: retryFailedOnly },
+  );
   return data;
 }
 

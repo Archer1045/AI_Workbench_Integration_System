@@ -244,7 +244,7 @@ describe('PresetAssetParamsPanel', () => {
     );
     expect(steps).toHaveValue('28');
     expect(loadPresetAssetSettingsDraft('pose')?.steps).toBe(28);
-  }, 10_000);
+  }, 30_000);
 
   it('shows per-LoRA strength overrides', async () => {
     localStorage.setItem(

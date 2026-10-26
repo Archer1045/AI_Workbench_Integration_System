@@ -253,7 +253,12 @@ def prepare_source_images(source_id: str):
 def analyze_source_images(source_id: str, payload: dict | None = None):
     try:
         model = str((payload or {}).get("model") or "")
-        return analyze_images(source_id, get_source_manager().sources, model=model)
+        return analyze_images(
+            source_id,
+            get_source_manager().sources,
+            model=model,
+            retry_failed_only=bool((payload or {}).get("retry_failed_only")),
+        )
     except SourceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

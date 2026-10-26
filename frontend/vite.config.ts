@@ -1,5 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process';
+import { cp, rm } from 'fs/promises';
 import net from 'net';
+import path from 'path';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
@@ -95,8 +97,36 @@ function autoStartBackend(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), autoStartBackend()],
+function copyPublicAssetsWithoutGit(): Plugin {
+  let root = '';
+  return {
+    name: 'copy-public-assets-without-git',
+    configResolved(config) {
+      root = config.root;
+    },
+    async writeBundle(options) {
+      const publicDir = path.resolve(root, 'public');
+      const outDir = options.dir
+        ? path.resolve(root, options.dir)
+        : path.resolve(root, 'dist');
+      await rm(path.join(outDir, '.git'), { recursive: true, force: true });
+      await cp(publicDir, outDir, {
+        recursive: true,
+        filter(source) {
+          return path.basename(source) !== '.git';
+        },
+      });
+    },
+  };
+}
+
+export default defineConfig(({ command }) => ({
+  publicDir: command === 'build' ? false : 'public',
+  plugins: [
+    react(),
+    autoStartBackend(),
+    ...(command === 'build' ? [copyPublicAssetsWithoutGit()] : []),
+  ],
   server: {
     port: FRONTEND_PORT,
     strictPort: true,
@@ -116,4 +146,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

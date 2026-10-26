@@ -182,11 +182,15 @@ export default function SourceIngestPanel({
     }
   };
 
-  const analyzeImages = async () => {
+  const analyzeImages = async (retryFailedOnly = false) => {
     if (!selected) return;
     setBusy('vision');
     try {
-      const result = await analyzeSourceImages(selected.source_id);
+      const result = await analyzeSourceImages(
+        selected.source_id,
+        '',
+        retryFailedOnly,
+      );
       const updated = { ...selected, image_assets: result.images };
       setSources((items) => items.map((item) => item.source_id === selected.source_id ? updated : item));
       messageApi.success('图片识别完成：成功 ' + result.completed + '，失败 ' + result.failed);
@@ -330,6 +334,9 @@ export default function SourceIngestPanel({
         <Button type="primary" loading={busy === 'ingest'} onClick={() => void ingest()}>
           抓取并保存来源
         </Button>
+        <p className="ga-small ga-muted">
+          Bilibili Opus 使用公开详情 API 读取正文段落、标题和图片顺序；失败时仍可粘贴正文或逐图上传作为降级入口。
+        </p>
       </div>
 
       {sources.length === 0 ? (
@@ -376,7 +383,12 @@ export default function SourceIngestPanel({
                   />
                   <Space wrap>
                     <Button loading={busy === 'images'} onClick={() => void prepareImages()}>准备图片</Button>
-                    <Button loading={busy === 'vision'} disabled={!selected.image_assets.some((item) => item.status === 'downloaded')} onClick={() => void analyzeImages()}>识别图片</Button>
+                      <Button loading={busy === 'vision'} disabled={!selected.image_assets.some((item) => item.status === 'downloaded')} onClick={() => void analyzeImages()}>识别图片</Button>
+                      {selected.image_assets.some((item) => item.analysis_status === 'failed') ? (
+                        <Button loading={busy === 'vision'} onClick={() => void analyzeImages(true)}>
+                          重试失败图片
+                        </Button>
+                      ) : null}
                   </Space>
                   <div className="ga-image-grid">
                     {selected.image_assets.map((asset) => (
@@ -387,6 +399,15 @@ export default function SourceIngestPanel({
                           <div className="ga-image-placeholder">{asset.status === 'failed' ? '下载失败' : '待下载'}</div>
                         )}
                         <strong>{asset.image_id}</strong>
+                        <div className="ga-small ga-muted">
+                          第 {asset.paragraph_index || '?'} 段
+                          {asset.section ? ` · ${asset.section}` : ' · 章节待识别'}
+                        </div>
+                        {asset.width > 0 && asset.height > 0 ? (
+                          <div className="ga-small ga-muted">
+                            {asset.width}×{asset.height}
+                          </div>
+                        ) : null}
                         {asset.error && <span className="ga-small">{asset.error}</span>}
                         {asset.analysis_status === 'completed' && <div className="ga-image-ocr">{asset.analysis_text}</div>}
                         {asset.analysis_error && <span className="ga-small">{asset.analysis_error}</span>}
