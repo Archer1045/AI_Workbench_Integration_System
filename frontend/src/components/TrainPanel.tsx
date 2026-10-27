@@ -766,11 +766,6 @@ export default function TrainPanel() {
   }, [highlightName]);
 
   const handleStartCaption = async () => {
-    const block = await busyBlockMessage();
-    if (block) {
-      showBusyWarning(block);
-      return;
-    }
     setStarting(true);
     try {
       const { data } = await api.post<{
@@ -1384,11 +1379,6 @@ export default function TrainPanel() {
     }
     if (compareLoras.length === 0) {
       message.warning('请选择要对比的 LoRA');
-      return;
-    }
-    const block = await busyBlockMessage();
-    if (block) {
-      showBusyWarning(block);
       return;
     }
     setRecentCompareCombos((current) => addRecentCompareCombo(current, compareLoras));

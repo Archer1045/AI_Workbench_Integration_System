@@ -25,6 +25,24 @@ def test_exclusive_conflict_releases_on_finish(tmp_path, monkeypatch):
     task_registry.finish("train", "train-resource-1", "done")
 
 
+def test_merge_can_register_without_gpu_while_draw_is_running(tmp_path, monkeypatch):
+    _init(tmp_path, monkeypatch)
+    task_registry.register(
+        "draw",
+        "draw-merge-peer",
+        resources=task_resources.for_kind("draw"),
+    )
+    task_registry.register(
+        "merge",
+        "merge-cpu-only",
+        resources=task_resources.for_kind("merge"),
+    )
+    running = task_registry.running_tasks()
+    assert {item["type"] for item in running} == {"draw", "merge"}
+    task_registry.finish("merge", "merge-cpu-only", "done")
+    task_registry.finish("draw", "draw-merge-peer", "done")
+
+
 def test_queued_task_claims_only_after_running(tmp_path, monkeypatch):
     _init(tmp_path, monkeypatch)
     task_registry.register(

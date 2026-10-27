@@ -32,7 +32,6 @@ import {
   type VideoScriptItem,
   type VideoScriptPayload,
 } from '../api';
-import { busyBlockMessage, showBusyWarning } from '../stores/busy';
 import { getRuntimeConfig } from '../stores/runtimeConfig';
 import { settingsStore } from '../stores/settings';
 
@@ -334,11 +333,6 @@ export default function VideoPanel() {
     }
     if (!prompt.trim()) {
       message.warning('正向提示词不能为空');
-      return;
-    }
-    const block = await busyBlockMessage();
-    if (block) {
-      showBusyWarning(block);
       return;
     }
     const [widthText, heightText] = size.split('×');

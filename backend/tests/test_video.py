@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 
 import database
+import task_registry
+import task_resources
 import video_worker
 
 
@@ -155,9 +157,57 @@ def test_video_generate_validation(client, tmp_path, monkeypatch):
     assert record["seed"] == 7
 
 
-def test_system_busy_includes_video_label(client):
-    import task_registry
+def test_video_uses_resource_claims_instead_of_global_busy(
+    client,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from routers import video as video_router
 
+    keyframe_dir = tmp_path / "keyframes"
+    keyframe_dir.mkdir()
+    monkeypatch.setattr(video_router, "VIDEO_KEYFRAME_DIR", keyframe_dir)
+    monkeypatch.setattr(video_worker, "VIDEO_KEYFRAME_DIR", keyframe_dir)
+    monkeypatch.setattr(video_worker, "VIDEO_OUTPUT_DIR", tmp_path / "videos")
+    monkeypatch.setattr(video_worker, "run_video_job", lambda job_id, params: None)
+    _keyframe(keyframe_dir)
+    payload = {
+        "prompt": "woman walking",
+        "negative_prompt": "static",
+        "keyframe_name": "key.png",
+        "frames": 121,
+        "width": 512,
+        "height": 512,
+        "steps": 20,
+        "cfg": 6,
+        "denoise": 1,
+        "seed": 8,
+    }
+
+    task_registry.register("merge", "merge-running")
+    try:
+        started = client.post("/api/video/generate", json=payload)
+        assert started.status_code == 200, started.text
+    finally:
+        video_job_id = started.json().get("job_id", "") if started.status_code == 200 else ""
+        if video_job_id:
+            task_registry.finish("video", video_job_id, "done")
+        task_registry.finish("merge", "merge-running", "done")
+
+    task_registry.register(
+        "draw",
+        "draw-holding-gpu",
+        resources=task_resources.for_kind("draw"),
+    )
+    try:
+        blocked = client.post("/api/video/generate", json=payload)
+        assert blocked.status_code == 409
+        assert "资源冲突" in blocked.json()["detail"]
+    finally:
+        task_registry.finish("draw", "draw-holding-gpu", "done")
+
+
+def test_system_busy_includes_video_label(client):
     task_registry.register("video", "video-busy-1")
     try:
         response = client.get("/api/system/busy")

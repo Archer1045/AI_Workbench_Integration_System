@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import task_registry
+import task_resources
 from routers import train
 
 
@@ -89,14 +90,18 @@ def test_caption_idempotency_reuses_the_running_job(
     monkeypatch.setattr(train.threading, "Thread", _NoopThread)
 
     payload = {"mode": "wd14", "skip_existing": False, "batch_size": 1}
-    first = client.post(
-        "/api/train/caption",
-        json=payload,
-        headers={"Idempotency-Key": "caption-request-1"},
-    )
-    assert first.status_code == 200
-    first_body = first.json()
-    assert first_body["status"] == "running"
+    task_registry.register("merge", "merge-running")
+    try:
+        first = client.post(
+            "/api/train/caption",
+            json=payload,
+            headers={"Idempotency-Key": "caption-request-1"},
+        )
+        assert first.status_code == 200
+        first_body = first.json()
+        assert first_body["status"] == "running"
+    finally:
+        task_registry.finish("merge", "merge-running", "done")
 
     duplicate = client.post(
         "/api/train/caption",
@@ -110,3 +115,35 @@ def test_caption_idempotency_reuses_the_running_job(
     conflicting = client.post("/api/train/caption", json=payload)
     assert conflicting.status_code == 409
     _clear_caption_jobs()
+
+    task_registry.register(
+        "draw",
+        "draw-holding-gpu",
+        resources=task_resources.for_kind("draw"),
+    )
+    try:
+        blocked = client.post(
+            "/api/train/caption",
+            json=payload,
+            headers={"Idempotency-Key": "caption-request-2"},
+        )
+        assert blocked.status_code == 409
+        assert "资源冲突" in blocked.json()["detail"]
+    finally:
+        task_registry.finish("draw", "draw-holding-gpu", "done")
+
+
+def test_review_resource_conflict_does_not_leave_orphan_job(client) -> None:
+    train.REVIEW_JOBS.clear()
+    task_registry.register(
+        "draw",
+        "draw-review-conflict",
+        resources=task_resources.for_kind("draw"),
+    )
+    try:
+        response = client.post("/api/train/dataset/review", json={})
+        assert response.status_code == 409
+        assert "资源冲突" in response.json()["detail"]
+        assert train.REVIEW_JOBS == {}
+    finally:
+        task_registry.finish("draw", "draw-review-conflict", "done")

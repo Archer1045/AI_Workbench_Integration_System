@@ -613,10 +613,6 @@ def start_caption(
                 }
         if any(job["status"] == "running" for job in CAPTION_JOBS.values()):
             raise HTTPException(status_code=409, detail="已有打标任务在运行")
-    other_tasks = [task for task in task_state.running_tasks() if task["type"] != "caption"]
-    if other_tasks:
-        labels = "、".join(task["label"] for task in other_tasks)
-        raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
     if mode == "qwen" and not _ollama_available():
         raise HTTPException(status_code=503, detail="Ollama 未运行，无法使用 qwen2.5vl 模式")
     if mode == "wd14" and not (KOYA_PY.exists() and WD14_SCRIPT.exists()):
@@ -1753,10 +1749,6 @@ def start_dataset_review(payload: dict = Body(...)) -> dict:
     with REVIEW_LOCK:
         if any(job["status"] == "running" for job in REVIEW_JOBS.values()):
             raise HTTPException(status_code=409, detail="已有审查任务在运行")
-    other_tasks = [task for task in task_state.running_tasks() if task["type"] != "review"]
-    if other_tasks:
-        labels = "、".join(task["label"] for task in other_tasks)
-        raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
     job_id = uuid.uuid4().hex
     REVIEW_JOBS[job_id] = {
         "job_id": job_id,
@@ -1768,7 +1760,11 @@ def start_dataset_review(payload: dict = Body(...)) -> dict:
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "finished_at": None,
     }
-    task_registry.register("review", job_id, resources=task_resources.for_kind("review"))
+    try:
+        task_registry.register("review", job_id, resources=task_resources.for_kind("review"))
+    except Exception:
+        REVIEW_JOBS.pop(job_id, None)
+        raise
     threading.Thread(target=_run_review, args=(job_id, filenames), daemon=True).start()
     return {"job_id": job_id, "status": "running"}
 
@@ -1976,10 +1972,6 @@ def start_lora_merge(payload: dict = Body(...)) -> dict:
     with MERGE_LOCK:
         if any(job["status"] == "running" for job in MERGE_JOBS.values()):
             raise HTTPException(status_code=409, detail="已有合并任务在运行")
-    other_tasks = [task for task in task_state.running_tasks() if task["type"] != "merge"]
-    if other_tasks:
-        labels = "、".join(task["label"] for task in other_tasks)
-        raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
     try:
         ratio_a = float(payload.get("ratio_a", config.TRAIN_MERGE_RATIO_DEFAULT))
         ratio_b = float(payload.get("ratio_b", config.TRAIN_MERGE_RATIO_DEFAULT))
@@ -2201,7 +2193,16 @@ def start_compare_generate(payload: dict = Body(...)) -> dict:
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "finished_at": None,
     }
-    task_registry.register("compare", job_id, total=len(loras), resources=task_resources.for_kind("compare"))
+    try:
+        task_registry.register(
+            "compare",
+            job_id,
+            total=len(loras),
+            resources=task_resources.for_kind("compare"),
+        )
+    except Exception:
+        COMPARE_JOBS.pop(job_id, None)
+        raise
     threading.Thread(target=_run_compare, args=(job_id,), daemon=True).start()
     return {"job_id": job_id, "status": "running"}
 

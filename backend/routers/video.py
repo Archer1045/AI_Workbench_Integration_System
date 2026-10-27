@@ -17,7 +17,6 @@ import content_filter
 import config
 import database
 import llm
-import task_state
 import task_registry
 import task_resources
 import video_worker
@@ -305,11 +304,6 @@ def start_video(payload: dict = Body(...)) -> dict:
             ),
         )
 
-    busy_tasks = task_state.running_tasks()
-    if busy_tasks:
-        labels = "、".join(task["label"] for task in busy_tasks)
-        raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
-
     use_lora = bool(payload.get("use_lora", True))
     seed = payload.get("seed")
     try:
@@ -319,20 +313,6 @@ def start_video(payload: dict = Body(...)) -> dict:
 
     job_id = uuid.uuid4().hex
     loras = [config.VIDEO_LORA] if use_lora else []
-    database.insert_video_record(
-        job_id,
-        script_id,
-        keyframe_name,
-        prompt,
-        negative_prompt,
-        config.VIDEO_MODEL,
-        loras,
-        seed,
-        width,
-        height,
-        frames,
-        fps,
-    )
     params = {
         "keyframe_name": keyframe_name,
         "positive_prompt": prompt,
@@ -356,6 +336,24 @@ def start_video(payload: dict = Body(...)) -> dict:
         "script_id": script_id,
     }
     task_registry.register("video", job_id, payload=params, total=frames, resources=task_resources.for_kind("video"))
+    try:
+        database.insert_video_record(
+            job_id,
+            script_id,
+            keyframe_name,
+            prompt,
+            negative_prompt,
+            config.VIDEO_MODEL,
+            loras,
+            seed,
+            width,
+            height,
+            frames,
+            fps,
+        )
+    except Exception:
+        task_registry.finish("video", job_id, "error", "视频记录写入失败")
+        raise
     threading.Thread(target=video_worker.run_video_job, args=(job_id, params), daemon=True).start()
     return {"job_id": job_id, "status": "running", "record_id": database.get_video_record_by_job(job_id)["id"]}
 
