@@ -15,6 +15,7 @@ import {
   type PromptValidation,
 } from '../api';
 import { busyBlockMessage, showBusyWarning } from './busy';
+import { batchElapsedSeconds } from '../drawTiming';
 import { getRuntimeConfig } from './runtimeConfig';
 import { uiStore } from './ui';
 import {
@@ -82,6 +83,8 @@ interface DrawState {
   batchId: string;
   total: number;
   done: number;
+  elapsedSeconds: number;
+  elapsedSyncedAt: number;
   results: DrawResult[];
   restoreVersion: number;
   [key: string]: unknown;
@@ -351,6 +354,8 @@ export const drawStore = useStore<DrawState>({
   batchId: '',
   total: 0,
   done: 0,
+  elapsedSeconds: 0,
+  elapsedSyncedAt: 0,
   results: [],
   restoreVersion: 0,
 });
@@ -568,11 +573,12 @@ async function validatePrompts(): Promise<boolean> {
 async function pollBatch(batchId: string): Promise<void> {
   drawStore.batchId = batchId;
   while (true) {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
     const jobRes = await api.get<BatchJob>(`/draw/batch/${batchId}`);
     const job = jobRes.data;
     drawStore.total = job.total;
     drawStore.done = job.done;
+    drawStore.elapsedSeconds = batchElapsedSeconds(job);
+    drawStore.elapsedSyncedAt = Date.now();
     drawStore.results = job.results || [];
     drawStore.status =
       job.status === 'running'
@@ -585,6 +591,7 @@ async function pollBatch(batchId: string): Promise<void> {
               ? '上次任务被中断'
               : `生成失败：${job.error || ''}`;
     if (job.status === 'done' || job.status === 'error' || job.status === 'stopped' || job.status === 'interrupted') break;
+    await new Promise((resolve) => setTimeout(resolve, 1500));
   }
   saveDrawLast({ v: 1, kind: 'batch', batchId });
 }
@@ -635,6 +642,8 @@ export async function runDraw(): Promise<void> {
   drawStore.results = [];
   drawStore.batchId = '';
   drawStore.done = 0;
+  drawStore.elapsedSeconds = 0;
+  drawStore.elapsedSyncedAt = Date.now();
   drawStore.total = groups.reduce((sum, group) => sum + group.count, 0);
   clearDrawLast();
   try {
@@ -690,6 +699,8 @@ export async function regenerateCurrent(seed?: number): Promise<void> {
   drawStore.status = seed ? '正在以相同 seed 重新生成...' : '正在重新生成...';
   drawStore.results = [];
   drawStore.done = 0;
+  drawStore.elapsedSeconds = 0;
+  drawStore.elapsedSyncedAt = Date.now();
   drawStore.total = 1;
   drawStore.batchId = '';
   clearDrawLast();
@@ -822,6 +833,8 @@ export async function restoreDrawLast(): Promise<void> {
     }
     drawStore.total = data.total || 0;
     drawStore.done = data.done || 0;
+    drawStore.elapsedSeconds = batchElapsedSeconds(data);
+    drawStore.elapsedSyncedAt = Date.now();
     drawStore.results = data.results || [];
     drawStore.status = data.status === 'done' ? '已恢复上次生成结果' : `上次结果：${data.status || '未完成'}`;
     if (data.status === 'running') {
@@ -840,6 +853,8 @@ export function clearDrawResult(): void {
   drawStore.status = '';
   drawStore.batchId = '';
   drawStore.done = 0;
+  drawStore.elapsedSeconds = 0;
+  drawStore.elapsedSyncedAt = 0;
   drawStore.total = 0;
 }
 

@@ -1082,6 +1082,8 @@ export interface BatchJob {
   error?: string | null;
   created_at?: string;
   finished_at?: string | null;
+  elapsed_seconds?: number;
+  server_now?: string;
   duration_seconds?: number;
   steps_done?: number;
   steps_total?: number;

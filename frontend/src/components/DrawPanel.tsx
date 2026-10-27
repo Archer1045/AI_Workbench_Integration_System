@@ -132,6 +132,7 @@ import {
   type DrawGroup,
 } from '../stores/draw';
 import { getRuntimeConfig } from '../stores/runtimeConfig';
+import { projectedDrawElapsed } from '../drawTiming';
 import {
   presetAssetStore,
   setPresetAssetSelection,
@@ -480,6 +481,9 @@ export default function DrawPanel({
     status,
     total,
     done,
+    batchId,
+    elapsedSeconds,
+    elapsedSyncedAt,
     results,
     restoreVersion,
   } = drawStore;
@@ -761,15 +765,23 @@ export default function DrawPanel({
     };
   }, [structuredPreviewKey, negativePrompt]);
 
-  // 生成过程中每秒更新按钮上的计时
+  // 状态接口提供后端耗时基准；这里只做两次轮询之间的平滑显示。
   useEffect(() => {
-    if (generating) {
-      setElapsed(0);
-      const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
-      return () => window.clearInterval(timer);
-    }
-    setElapsed(0);
-  }, [generating]);
+    const update = () => {
+      setElapsed(
+        projectedDrawElapsed(
+          elapsedSeconds,
+          elapsedSyncedAt,
+          generating,
+          Date.now(),
+        ),
+      );
+    };
+    update();
+    if (!generating) return;
+    const timer = window.setInterval(update, 500);
+    return () => window.clearInterval(timer);
+  }, [elapsedSeconds, elapsedSyncedAt, generating]);
 
   // 自动保存用户绘画配置，刷新或关闭页面后恢复
   useEffect(() => {
@@ -3119,7 +3131,13 @@ export default function DrawPanel({
           <strong>
             {generating ? `生成中 ${done}/${total}` : `${groups.length} 组 · ${totalRequested} 张`}
           </strong>
-          <span>{generating ? `${elapsed}s · ${status}` : `${model || '未选模型'} · ${width}×${height}`}</span>
+          <span>
+            {generating
+              ? `${elapsed}s · ${status}`
+              : batchId
+                ? `总耗时 ${elapsed}s · ${status}`
+                : `${model || '未选模型'} · ${width}×${height}`}
+          </span>
         </div>
         <Space wrap>
           <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>

@@ -12,6 +12,7 @@ import threading
 import time
 import uuid
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
@@ -1915,7 +1916,31 @@ def draw_batch_status(batch_id: str) -> dict:
         job = database.get_batch_job(batch_id)
     if not job:
         raise HTTPException(status_code=404, detail="batch not found")
-    return job
+    result = dict(job)
+    try:
+        started_at = datetime.fromisoformat(str(job.get("created_at") or ""))
+        local_timezone = datetime.now().astimezone().tzinfo
+        if started_at.tzinfo is None:
+            started_at = started_at.replace(tzinfo=local_timezone)
+        finished_value = job.get("finished_at")
+        ended_at = (
+            datetime.fromisoformat(str(finished_value))
+            if finished_value
+            else datetime.now(started_at.tzinfo)
+        )
+        if ended_at.tzinfo is None:
+            ended_at = ended_at.replace(tzinfo=started_at.tzinfo)
+        result["elapsed_seconds"] = max(
+            0,
+            int((ended_at - started_at).total_seconds()),
+        )
+    except (TypeError, ValueError):
+        result["elapsed_seconds"] = max(
+            0,
+            int(result.get("duration_seconds") or 0),
+        )
+    result["server_now"] = database.now_iso()
+    return result
 
 
 @router.post("/api/draw/batch/{batch_id}/stop")
