@@ -16,7 +16,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import requests
-from fastapi import APIRouter, Body, HTTPException, Query, Response
+from fastapi import APIRouter, Body, Header, HTTPException, Query, Response
 
 import config
 import database
@@ -232,6 +232,7 @@ NOISE_MARKERS = (
 )
 
 CAPTION_JOBS: dict[str, dict] = {}
+CAPTION_IDEMPOTENCY: dict[str, str] = {}
 JOBS_LOCK = threading.Lock()
 TRAIN_JOBS: dict[str, dict] = {}
 TRAIN_LOCK = threading.Lock()
@@ -548,13 +549,68 @@ def _run_wd14(
         job["finished_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _wd14_progress(log_text: str) -> tuple[int, int] | None:
+    """Read the latest completed image count from the WD14 tqdm output."""
+    matches = re.findall(r"\|\s*(\d+)/(\d+)", log_text)
+    if not matches:
+        return None
+    done, total = matches[-1]
+    return int(done), int(total)
+
+
+def _caption_public(job: dict) -> dict:
+    """Return a caption job with live WD14 progress and a bounded log tail."""
+    public = {key: value for key, value in job.items() if key != "process"}
+    log_path_value = job.get("log_path")
+    if not log_path_value:
+        return public
+    try:
+        log_path = Path(log_path_value)
+        if not log_path.exists():
+            return public
+        lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        clean = [line for line in lines if not any(marker in line for marker in NOISE_MARKERS)]
+        public["log"] = "\n".join(clean)[-4000:]
+        if job.get("mode") == "wd14" and job.get("status") == "running":
+            progress = _wd14_progress(public["log"])
+            if progress:
+                done, total = progress
+                public["done"] = max(int(public.get("done") or 0), done)
+                public["total"] = total
+                if public["done"] != int(job.get("done") or 0):
+                    job["done"] = public["done"]
+                    job["total"] = total
+                    task_registry.update(
+                        "caption",
+                        str(job["job_id"]),
+                        done=public["done"],
+                        total=total,
+                    )
+    except Exception:
+        pass
+    return public
+
+
 @router.post("/api/train/caption")
-def start_caption(payload: dict = Body(...)) -> dict:
+def start_caption(
+    payload: dict = Body(...),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+) -> dict:
     """启动批量打标任务：wd14（默认）或 qwen2.5vl。"""
     mode = str(payload.get("mode") or "wd14").lower()
     if mode not in ("wd14", "qwen"):
         raise HTTPException(status_code=400, detail="mode 必须是 wd14 或 qwen")
+    key = str(idempotency_key or "").strip()[:200]
     with JOBS_LOCK:
+        if key:
+            existing_job_id = CAPTION_IDEMPOTENCY.get(key)
+            existing_job = CAPTION_JOBS.get(existing_job_id or "")
+            if existing_job:
+                return {
+                    "job_id": existing_job["job_id"],
+                    "status": existing_job["status"],
+                    "reused": True,
+                }
         if any(job["status"] == "running" for job in CAPTION_JOBS.values()):
             raise HTTPException(status_code=409, detail="已有打标任务在运行")
     other_tasks = [task for task in task_state.running_tasks() if task["type"] != "caption"]
@@ -582,8 +638,33 @@ def start_caption(payload: dict = Body(...)) -> dict:
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "finished_at": None,
     }
-    CAPTION_JOBS[job_id] = job
-    task_registry.register("caption", job_id, resources=task_resources.for_kind("caption"))
+    with JOBS_LOCK:
+        if key:
+            existing_job_id = CAPTION_IDEMPOTENCY.get(key)
+            existing_job = CAPTION_JOBS.get(existing_job_id or "")
+            if existing_job:
+                return {
+                    "job_id": existing_job["job_id"],
+                    "status": existing_job["status"],
+                    "reused": True,
+                }
+        if any(job["status"] == "running" for job in CAPTION_JOBS.values()):
+            raise HTTPException(status_code=409, detail="已有打标任务在运行")
+        CAPTION_JOBS[job_id] = job
+        if key:
+            CAPTION_IDEMPOTENCY[key] = job_id
+        try:
+            task_registry.register(
+                "caption",
+                job_id,
+                payload={"idempotency_key": key} if key else {},
+                resources=task_resources.for_kind("caption"),
+            )
+        except Exception:
+            CAPTION_JOBS.pop(job_id, None)
+            if key and CAPTION_IDEMPOTENCY.get(key) == job_id:
+                CAPTION_IDEMPOTENCY.pop(key, None)
+            raise
     skip_existing = bool(payload.get("skip_existing", True))
     if mode == "wd14":
         try:
@@ -628,23 +709,24 @@ def start_caption(payload: dict = Body(...)) -> dict:
     return {"job_id": job_id, "status": "running"}
 
 
+@router.get("/api/train/caption/latest")
+def latest_caption() -> dict:
+    """Return the newest caption job so a refreshed page can reconnect."""
+    with JOBS_LOCK:
+        jobs = list(CAPTION_JOBS.values())
+    if not jobs:
+        return {"item": None}
+    latest = max(jobs, key=lambda item: str(item.get("created_at") or ""))
+    return {"item": _caption_public(latest)}
+
+
 @router.get("/api/train/caption/{job_id}")
 def caption_status(job_id: str) -> dict:
     """查询打标任务进度，WD14 模式附带日志尾部。"""
     job = CAPTION_JOBS.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="job not found")
-    public = {key: value for key, value in job.items() if key != "process"}
-    if job.get("log_path"):
-        try:
-            log_path = Path(job["log_path"])
-            if log_path.exists():
-                lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
-                clean = [line for line in lines if not any(marker in line for marker in NOISE_MARKERS)]
-                public["log"] = "\n".join(clean)[-4000:]
-        except Exception:
-            pass
-    return public
+    return _caption_public(job)
 
 
 @router.post("/api/train/caption/{job_id}/stop")

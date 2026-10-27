@@ -5,6 +5,13 @@ import { Button, Checkbox, Collapse, Image, Input, InputNumber, message, Modal, 
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useRef, useState } from 'react';
 import { api, type CaptionJob, type CompareJob, type DatasetCheck, type DatasetInfo, type DatasetReviewJob, type DatasetReviewResult, type DatasetTagReplaceResult, type LoraItem, type MergeJob, type ModelItem, type TrainingJob, type TrainingOutput } from '../api';
+import {
+  captionIdempotencyKey,
+  clearCaptionIdempotencyKey,
+  clearCaptionTask,
+  loadCaptionTask,
+  saveCaptionTask,
+} from '../captionTaskState';
 import { drawStore } from '../stores/draw';
 import { busyBlockMessage, showBusyWarning } from '../stores/busy';
 import { getRuntimeConfig } from '../stores/runtimeConfig';
@@ -291,7 +298,7 @@ export default function TrainPanel() {
   const [threshold, setThreshold] = useState(savedTrainState.threshold);
   const [captionBatchSize, setCaptionBatchSize] = useState(savedTrainState.captionBatchSize);
   const [removeUnderscore, setRemoveUnderscore] = useState(savedTrainState.removeUnderscore);
-  const [jobId, setJobId] = useState('');
+  const [jobId, setJobId] = useState(loadCaptionTask);
   const [job, setJob] = useState<CaptionJob | null>(null);
   const [starting, setStarting] = useState(false);
 
@@ -473,6 +480,21 @@ export default function TrainPanel() {
     loadOutputs();
     loadLoras();
     api
+      .get<{ item: CaptionJob | null }>('/train/caption/latest')
+      .then((res) => {
+        if (!res.data.item) {
+          clearCaptionTask();
+          return;
+        }
+        setJobId(res.data.item.job_id);
+        setJob(res.data.item);
+        saveCaptionTask(res.data.item.job_id);
+        if (res.data.item.status !== 'running') {
+          clearCaptionIdempotencyKey();
+        }
+      })
+      .catch(() => undefined);
+    api
       .get<TrainingJob>('/train/training')
       .then((res) => {
         if (res.data && res.data.job_id) {
@@ -613,10 +635,19 @@ export default function TrainPanel() {
           if (res.data.status === 'running') {
             timer = window.setTimeout(tick, 2000);
           } else {
+            clearCaptionIdempotencyKey();
             loadDataset();
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
+          const status = (error as { response?: { status?: number } }).response?.status;
+          if (status === 404) {
+            clearCaptionTask();
+            clearCaptionIdempotencyKey();
+            setJobId('');
+            setJob(null);
+            return;
+          }
           timer = window.setTimeout(tick, 5000);
         });
     };
@@ -742,15 +773,26 @@ export default function TrainPanel() {
     }
     setStarting(true);
     try {
-      const { data } = await api.post<{ job_id: string; status: string }>('/train/caption', {
-        mode,
-        skip_existing: skipExisting,
-        threshold,
-        batch_size: captionBatchSize,
-        remove_underscore: removeUnderscore,
-        language,
-      });
+      const { data } = await api.post<{
+        job_id: string;
+        status: string;
+        reused?: boolean;
+      }>(
+        '/train/caption',
+        {
+          mode,
+          skip_existing: skipExisting,
+          threshold,
+          batch_size: captionBatchSize,
+          remove_underscore: removeUnderscore,
+          language,
+        },
+        {
+          headers: { 'Idempotency-Key': captionIdempotencyKey() },
+        },
+      );
       setJobId(data.job_id);
+      saveCaptionTask(data.job_id);
       setJob({
         job_id: data.job_id,
         mode,
@@ -761,6 +803,9 @@ export default function TrainPanel() {
         log: '',
         error: null,
       });
+      if (data.reused) {
+        message.info('已恢复正在运行的打标任务');
+      }
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: string } } }).response?.data?.detail;
       message.error(detail || '启动失败');
