@@ -884,7 +884,13 @@ export interface RunbookStep {
   card?: string;
   position?: string;
   /** 选卡偏好链：按顺序试，第一条能挑到卡的生效（例如 力击 → 任意卡）。 */
-  choose?: Array<{ card: string; position?: string; engraved_code?: string }>;
+  choose?: Array<{
+    owner?: string;
+    card: string;
+    position?: string;
+    engraved_code?: string;
+    crit?: boolean;
+  }>;
   target?: string;
 }
 
@@ -912,6 +918,7 @@ export interface RunbookCreated {
 export interface SupportLibrary {
   servant: string[];
   ce: string[];
+  card: string[];
 }
 
 export async function loadSupportLibrary(): Promise<SupportLibrary> {

@@ -145,19 +145,55 @@ def test_create_runbook_keeps_the_dps_and_defaults_support_targets(client, execu
     assert "默认指向" in response.json()["summary"], response.json()["summary"]
 
 
+def test_create_runbook_preserves_explicit_card_owner_fallback_chain(
+    client,
+    execution_env,
+) -> None:
+    draft = json.loads(json.dumps(VALID_DRAFT))
+    draft["name"] = "owner_chain.json"
+    draft["steps"] = [
+        {"turn": 1, "actor_slot": 1, "kind": "np"},
+        {
+            "turn": 1,
+            "actor_slot": 1,
+            "kind": "card",
+            "choose": [
+                {"owner": "莫德雷德(Rider)", "card": "buster", "position": "leftmost"},
+                {"owner": "莫德雷德(Rider)", "card": "any", "position": "leftmost"},
+                {"card": "any", "position": "leftmost"},
+            ],
+        },
+        {"turn": 1, "actor_slot": 1, "kind": "card", "card": "any", "position": "leftmost"},
+    ]
+
+    response = client.post(f"{BASE}/runbooks", json=draft)
+
+    assert response.status_code == 200, response.text
+    saved = json.loads((execution_env / "runbooks" / "owner_chain.json").read_text(encoding="utf-8"))
+    assert saved["steps"][1]["choose"] == draft["steps"][1]["choose"]
+    assert "莫德雷德(Rider)的力击" in response.json()["summary"]
+
+
 def test_support_library_lists_registered_names(client, execution_env) -> None:
     servant_dir = execution_env / "templates" / "support" / "servant"
     ce_dir = execution_env / "templates" / "support" / "ce"
+    card_dir = execution_env / "templates" / "support" / "card"
     servant_dir.mkdir(parents=True, exist_ok=True)
     ce_dir.mkdir(parents=True, exist_ok=True)
+    card_dir.mkdir(parents=True, exist_ok=True)
     (servant_dir / "a.json").write_text(
         json.dumps({"name": "阿尔托莉雅·卡斯特(Caster)"}, ensure_ascii=False), encoding="utf-8")
     (ce_dir / "b.json").write_text(json.dumps({"name": "贝拉丽莎"}, ensure_ascii=False), encoding="utf-8")
+    (card_dir / "c.json").write_text(
+        json.dumps({"name": "“山中老人”"}, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
     payload = client.get(f"{BASE}/support-library").json()
 
     assert payload["servant"] == ["阿尔托莉雅·卡斯特(Caster)"]
     assert payload["ce"] == ["贝拉丽莎"]
+    assert payload["card"] == ["“山中老人”"]
 
 
 REGISTER_REPORT_LINE = (

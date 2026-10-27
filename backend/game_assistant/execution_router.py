@@ -353,7 +353,7 @@ def support_library() -> dict[str, list[str]]:
     """已登记过的助战指纹（表单里勾助战规则用）：按从者、按礼装两份名字清单。"""
     base = execution_dir() / "templates" / "support"
     result: dict[str, list[str]] = {}
-    for kind in ("servant", "ce"):
+    for kind in ("servant", "ce", "card"):
         names: list[str] = []
         directory = base / kind
         if directory.is_dir():

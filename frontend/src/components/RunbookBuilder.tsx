@@ -3,8 +3,8 @@
 // 提交后走后端 `POST /execution/runbooks`：**先编译期校验**（同名歧义、技能槽越界、
 // 每回合必须 3 个出手位），通过才落盘，随后自动出现在执行页的 runbook 下拉里。
 // 助战规则按「从者 + 礼装白名单」——白名单里的礼装指纹要先在助战屏登记（见下方提示）。
-import { Alert, Button, Card, Checkbox, Input, InputNumber, Modal, Select, Space, Tag, message } from 'antd';
-import { PlusOutlined, SaveOutlined, DeleteOutlined, CameraOutlined, ImportOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Input, InputNumber, Modal, Select, Space, Tag, message } from 'antd';
+import { ArrowDownOutlined, ArrowUpOutlined, PlusOutlined, SaveOutlined, DeleteOutlined, CameraOutlined, ImportOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createRunbook,
@@ -25,7 +25,11 @@ import {
   type SupportRegisterResult,
   type SupportLibrary,
 } from '../stores/gameAssistant';
-import { runbookTeamMemberName } from '../runbookDraft';
+import {
+  buildRunbookCardChoices,
+  runbookTeamMemberName,
+  type RunbookCardPreference,
+} from '../runbookDraft';
 
 const TURNS = [1, 2, 3];
 const KIND_OPTIONS = [
@@ -62,7 +66,12 @@ function describeStep(step: DraftStep): string {
   if (step.kind === 'np') return `第${step.turn}回合 · ${who} 宝具`;
   if (step.kind === 'card') {
     const chain = step.choose?.length
-      ? step.choose.map((entry) => CARD_LABELS[entry.card] ?? entry.card).join('→')
+      ? step.choose
+          .map((entry) => {
+            const card = CARD_LABELS[entry.card] ?? entry.card;
+            return entry.owner ? `${entry.owner}·${card}` : card;
+          })
+          .join('→')
       : CARD_LABELS[step.card ?? 'any'] ?? 'any';
     return `第${step.turn}回合 · ${who} 出卡（${chain}）`;
   }
@@ -72,7 +81,7 @@ function describeStep(step: DraftStep): string {
 
 export default function RunbookBuilder({ onCreated }: { onCreated?: () => void }) {
   const [servants, setServants] = useState<AccountServantBrief[]>([]);
-  const [library, setLibrary] = useState<SupportLibrary>({ servant: [], ce: [] });
+  const [library, setLibrary] = useState<SupportLibrary>({ servant: [], ce: [], card: [] });
   const [name, setName] = useState('my_runbook.json');
   const [questId, setQuestId] = useState('');
   const [title, setTitle] = useState('');
@@ -85,7 +94,8 @@ export default function RunbookBuilder({ onCreated }: { onCreated?: () => void }
   const [draftActor, setDraftActor] = useState('');
   const [draftSlot, setDraftSlot] = useState(1);
   const [draftCard, setDraftCard] = useState('any');
-  const [cardFallback, setCardFallback] = useState(true);
+  const [draftCardOwner, setDraftCardOwner] = useState(0);
+  const [cardPreferences, setCardPreferences] = useState<RunbookCardPreference[]>([]);
   const [dpsSlot, setDpsSlot] = useState(0);
   const [draftTarget, setDraftTarget] = useState('');
   const [busy, setBusy] = useState(false);
@@ -218,16 +228,26 @@ export default function RunbookBuilder({ onCreated }: { onCreated?: () => void }
     const targetName = draftTarget && team[Number(draftTarget) - 1]
       ? submittedServantName(team[Number(draftTarget) - 1])
       : '';
+    const fallbackPreferences = cardPreferences.length
+      ? cardPreferences
+      : [{ ownerSlot: draftCardOwner, card: draftCard }];
+    if (
+      draftKind === 'card' &&
+      fallbackPreferences.some(
+        (preference) =>
+          preference.ownerSlot > 0 && !team[preference.ownerSlot - 1],
+      )
+    ) {
+      message.warning('偏好链里的卡主站位已经为空，请先选择从者或移除该偏好');
+      return;
+    }
     const step: DraftStep = draftKind === 'card'
       ? {
           turn: draftTurn,
           actor,
           actor_slot: actorSlot,
           kind: 'card',
-          // 「没有就退到任意卡」：编成偏好链，第一条挑不到就自动走第二条（不再停在原地）
-          choose: cardFallback
-            ? [{ card: draftCard, position: 'leftmost' }, { card: 'any', position: 'leftmost' }]
-            : [{ card: draftCard, position: 'leftmost' }],
+          choose: buildRunbookCardChoices(fallbackPreferences, team, servants),
         }
       : draftKind === 'np'
         ? { turn: draftTurn, actor, actor_slot: actorSlot, kind: 'np' }
@@ -236,7 +256,57 @@ export default function RunbookBuilder({ onCreated }: { onCreated?: () => void }
             ...(targetName ? { target: targetName } : {}),
           };
     setSteps((current) => [...current, step]);
-  }, [cardFallback, draftActor, draftCard, draftKind, draftSlot, draftTarget, draftTurn, submittedServantName, team]);
+  }, [cardPreferences, draftActor, draftCard, draftCardOwner, draftKind, draftSlot, draftTarget, draftTurn, servants, submittedServantName, team]);
+
+  const addCardPreference = useCallback(() => {
+    const preference = { ownerSlot: draftCardOwner, card: draftCard };
+    setCardPreferences((current) => {
+      if (current.some(
+        (item) =>
+          item.ownerSlot === preference.ownerSlot &&
+          item.card === preference.card,
+      )) {
+        message.info('这条偏好已经在链里');
+        return current;
+      }
+      return [...current, preference];
+    });
+  }, [draftCard, draftCardOwner]);
+
+  const moveCardPreference = (index: number, delta: number) => {
+    setCardPreferences((current) => {
+      const target = index + delta;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const cardOwnerOptions = actorOptions.map((item) => ({
+    value: Number(item.value),
+    label: `卡主：${item.label.replace(/^站位 \d+ · /, '')}`,
+  }));
+  const cardPreferenceLabel = (preference: RunbookCardPreference) => {
+    const ownerKey = preference.ownerSlot > 0
+      ? team[preference.ownerSlot - 1]
+      : '';
+    const owner = ownerKey
+      ? runbookTeamMemberName(ownerKey, servants)
+      : '不限卡主';
+    return `${owner} · ${CARD_LABELS[preference.card] || preference.card}`;
+  };
+  const unregisteredCardOwners = Array.from(
+    new Set(
+      cardPreferences
+        .filter((preference) => preference.ownerSlot > 0)
+        .map((preference) => {
+          const key = team[preference.ownerSlot - 1];
+          return key ? runbookTeamMemberName(key, servants) : '';
+        })
+        .filter((name) => name && !(library.card || []).includes(name)),
+    ),
+  );
 
   const submit = useCallback(async () => {
     setError('');
@@ -489,19 +559,96 @@ export default function RunbookBuilder({ onCreated }: { onCreated?: () => void }
             {draftKind === 'card' && (
               <>
                 <Select
+                  style={{ width: 220 }}
+                  placeholder="卡主（不选 = 不限卡主）"
+                  allowClear
+                  value={draftCardOwner || undefined}
+                  options={cardOwnerOptions}
+                  onChange={(value) => setDraftCardOwner(Number(value) || 0)}
+                />
+                <Select
                   style={{ width: 130 }} value={draftCard} options={CARD_OPTIONS}
                   onChange={setDraftCard}
                 />
                 <Select
                   style={{ width: 130 }} value="leftmost" options={POSITION_OPTIONS} disabled
                 />
-                <Checkbox checked={cardFallback} onChange={(event) => setCardFallback(event.target.checked)}>
-                  <span className="ga-small">没有这种卡就改出任意卡</span>
-                </Checkbox>
+                <Button size="small" onClick={addCardPreference}>
+                  加入偏好链
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    if (
+                      cardPreferences.some(
+                        (item) => item.ownerSlot === 0 && item.card === 'any',
+                      )
+                    ) {
+                      message.info('链里已经有任意卡兜底');
+                      return;
+                    }
+                    setCardPreferences((current) => [
+                      ...current,
+                      { ownerSlot: 0, card: 'any' },
+                    ]);
+                  }}
+                >
+                  加任意卡兜底
+                </Button>
               </>
             )}
             <Button icon={<PlusOutlined />} onClick={addStep}>加动作</Button>
           </Space>
+          {draftKind === 'card' ? (
+            <div style={{ marginTop: 6 }}>
+              <div className="ga-small ga-muted">
+                本动作的选卡偏好链（从上到下尝试；全部不满足会停手，不会静默改卡）：
+                {cardPreferences.length === 0
+                  ? ' 未设置时只尝试上方当前选择。'
+                  : ''}
+              </div>
+              <Space wrap style={{ marginTop: 4 }}>
+                {cardPreferences.map((preference, index) => (
+                  <Tag
+                    key={`${preference.ownerSlot}-${preference.card}-${index}`}
+                    closable
+                    onClose={() =>
+                      setCardPreferences((current) =>
+                        current.filter((_, at) => at !== index),
+                      )
+                    }
+                  >
+                    {index + 1}. {cardPreferenceLabel(preference)}
+                    <Button
+                      type="text"
+                      size="small"
+                      aria-label={`上移偏好 ${index + 1}`}
+                      icon={<ArrowUpOutlined />}
+                      disabled={index === 0}
+                      onClick={() => moveCardPreference(index, -1)}
+                    />
+                    <Button
+                      type="text"
+                      size="small"
+                      aria-label={`下移偏好 ${index + 1}`}
+                      icon={<ArrowDownOutlined />}
+                      disabled={index === cardPreferences.length - 1}
+                      onClick={() => moveCardPreference(index, 1)}
+                    />
+                  </Tag>
+                ))}
+              </Space>
+              {unregisteredCardOwners.length ? (
+                <Alert
+                  style={{ marginTop: 6 }}
+                  type="warning"
+                  showIcon
+                  message={`卡主指纹未登记：${unregisteredCardOwners.join('、')}`}
+                  description="执行到该偏好时会停手并提示，不会自动改选其他卡。请先在卡面/选牌屏登记卡主指纹，或显式添加“任意卡”兜底。"
+                />
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div>
