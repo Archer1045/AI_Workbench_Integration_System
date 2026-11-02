@@ -38,10 +38,17 @@ import {
   type WaterPreset,
 } from '../api';
 import {
+  formatPresetInsert,
+  formatScenePresetInsert,
   PRESET_SCOPE_OPTIONS,
+  posePromptForInsert,
   type PosePromptDetail,
   type ScenePeoplePolicy,
 } from '../presetComposition';
+import {
+  formatClothingInsert,
+  type ClothingScope,
+} from '../clothingPresets';
 import {
   presetCategoryGroup,
   presetSubcategory,
@@ -68,6 +75,17 @@ export type PresetLibraryItem = PresetTaxonomyFields & {
   label: string;
   translation?: string;
   tags?: string[];
+  draw_prompt?: string | null;
+  empty_scene_prompt?: string | null;
+  occupied_scene_prompt?: string | null;
+  people?: string | null;
+  people_count?: number | null;
+  people_prompt?: string | null;
+  role_slots?: string[];
+  core_tags?: string[];
+  expression_tags?: string[];
+  gaze?: string[];
+  face_details?: string[];
   aliases?: string[];
   intensity?: string;
   character_scope?: string[];
@@ -83,6 +101,68 @@ export interface PresetLibraryApplyOptions {
   scope: PresetScope;
   poseDetail: PosePromptDetail;
   scenePeoplePolicy: ScenePeoplePolicy;
+}
+
+export function presetPromptForCopy(
+  kind: string,
+  item: PresetLibraryItem,
+  options: PresetLibraryApplyOptions,
+): string {
+  if (kind === 'pose') {
+    return posePromptForInsert(
+      {
+        tags: item.tags || [],
+        draw_prompt: item.draw_prompt ?? null,
+        people: item.people ?? null,
+        people_count: item.people_count ?? null,
+        people_prompt: item.people_prompt ?? null,
+        role_slots: item.role_slots || [],
+        core_tags: item.core_tags || [],
+      },
+      options.poseDetail,
+    );
+  }
+  if (kind === 'clothing') {
+    return formatClothingInsert(
+      item as unknown as Parameters<typeof formatClothingInsert>[0],
+      options.scope as ClothingScope,
+    );
+  }
+  if (kind === 'scene') {
+    return formatScenePresetInsert(
+      item as unknown as Parameters<typeof formatScenePresetInsert>[0],
+      options.scope,
+      options.scenePeoplePolicy,
+    );
+  }
+  if (kind === 'expression') {
+    const expressionTags = item.expression_tags?.length
+      ? item.expression_tags
+      : item.tags || [];
+    const tags = Array.from(
+      new Map(
+        [
+          ...expressionTags,
+          ...(item.gaze || []),
+          ...(item.face_details || []),
+        ]
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .map((tag) => [tag.toLowerCase(), tag]),
+      ).values(),
+    );
+    return formatPresetInsert({ tags, draw_prompt: null }, options.scope);
+  }
+  if (kind === 'water' && item.target === '环境') {
+    return (item.tags || []).join(', ');
+  }
+  return formatPresetInsert(
+    {
+      tags: item.tags || [],
+      draw_prompt: item.draw_prompt ?? null,
+    },
+    options.scope,
+  );
 }
 
 type PresetLibraryKind = Pick<
@@ -525,6 +605,25 @@ export default function PresetLibraryPanel({
     }
   };
 
+  const copyPrompt = async (item: PresetLibraryItem) => {
+    if (!activeMetadata) return;
+    const prompt = presetPromptForCopy(activeMetadata.kind, item, {
+      scope,
+      poseDetail,
+      scenePeoplePolicy,
+    }).trim();
+    if (!prompt) {
+      message.warning('该预设没有可复制的提示词');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(prompt);
+      message.success('提示词已复制');
+    } catch {
+      message.error('提示词复制失败');
+    }
+  };
+
   const selectedIsFavorite = Boolean(
     selectedItem && favorites.includes(selectedItem.id),
   );
@@ -880,6 +979,14 @@ export default function PresetLibraryPanel({
                       应用到当前提示词
                     </Button>
                   ) : null}
+                  <Button
+                    block
+                    icon={<CopyOutlined />}
+                    aria-label="复制提示词"
+                    onClick={() => void copyPrompt(selectedItem)}
+                  >
+                    复制提示词
+                  </Button>
                   {supportsComposition ? (
                     <Button
                       block

@@ -15,7 +15,10 @@ vi.mock('../stores/settings', () => ({
   settingsStore: { restrictionEnabled: false },
 }));
 
-import PresetLibraryPanel from './PresetLibraryPanel';
+import PresetLibraryPanel, {
+  presetPromptForCopy,
+  type PresetLibraryItem,
+} from './PresetLibraryPanel';
 
 const expression = {
   id: 'expression_soft_smile',
@@ -80,6 +83,86 @@ beforeEach(() => {
 });
 
 describe('PresetLibraryPanel', () => {
+  it('builds copy text with the active type and insertion options', () => {
+    const options = {
+      scope: 'girlA' as const,
+      poseDetail: 'full' as const,
+      scenePeoplePolicy: 'empty' as const,
+    };
+    const base = {
+      label: '测试预设',
+      translation: '测试',
+      rating: '普通',
+    };
+
+    expect(
+      presetPromptForCopy(
+        'pose',
+        {
+          ...base,
+          id: 'pose-test',
+          tags: ['standing', 'arched back'],
+          people: '单人',
+          draw_prompt: 'full body composition',
+        } as PresetLibraryItem,
+        options,
+      ),
+    ).toBe(
+      'exactly 1 person, standing, arched back, full body composition',
+    );
+    expect(
+      presetPromptForCopy(
+        'clothing',
+        {
+          ...base,
+          id: 'clothing-test',
+          tags: ['white dress'],
+        } as PresetLibraryItem,
+        options,
+      ),
+    ).toBe('the first girl wearing white dress');
+    expect(
+      presetPromptForCopy(
+        'scene',
+        {
+          ...base,
+          id: 'scene-test',
+          tags: ['bedroom'],
+          empty_scene_prompt: 'quiet bedroom, no people',
+        } as PresetLibraryItem,
+        options,
+      ),
+    ).toBe('for the first girl: quiet bedroom, no people');
+    expect(
+      presetPromptForCopy(
+        'water',
+        {
+          ...base,
+          id: 'water-test',
+          tags: ['wet floor', 'rain'],
+          target: '环境',
+        } as PresetLibraryItem,
+        options,
+      ),
+    ).toBe('wet floor, rain');
+    expect(
+      presetPromptForCopy(
+        'expression',
+        {
+          ...base,
+          id: 'expression-test',
+          tags: ['ignored fallback'],
+          expression_tags: ['calm expression', 'relaxed face'],
+          gaze: ['soft gaze'],
+          face_details: ['natural lips'],
+        } as PresetLibraryItem,
+        options,
+      ),
+    ).toBe(
+      'for the first girl: calm expression, relaxed face, soft gaze, natural lips',
+    );
+  });
+
   it('loads expression presets into the unified selector and applies with options', async () => {
     const onApply = vi.fn();
     render(<PresetLibraryPanel variant="drawer" onApply={onApply} />);
@@ -105,6 +188,33 @@ describe('PresetLibraryPanel', () => {
         scenePeoplePolicy: 'occupied',
       },
     );
+  }, 15000);
+
+  it('copies the selected prompt without applying it to the current group', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const onApply = vi.fn();
+    render(<PresetLibraryPanel variant="drawer" onApply={onApply} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^体位/ })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^表情/ }));
+    await waitFor(() =>
+      expect(screen.getAllByText('柔和微笑').length).toBeGreaterThan(0),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '复制提示词' }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        'soft smile, gentle smile, closed mouth',
+      ),
+    );
+    expect(onApply).not.toHaveBeenCalled();
   }, 15000);
 
   it('supports favorites and recent-use filtering within the active type', async () => {
