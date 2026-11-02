@@ -56,7 +56,11 @@ def test_migrations_idempotent(tmp_path, monkeypatch):
         .execute("PRAGMA table_info(character_appearance_presets)")
         .fetchall()
     }
-    assert {"outfit_set_id", "outfit_set_version"} <= appearance_columns
+    assert {
+        "identity_tags",
+        "outfit_set_id",
+        "outfit_set_version",
+    } <= appearance_columns
     draw_columns = {
         row["name"]
         for row in database.get_connection().execute("PRAGMA table_info(draw_records)").fetchall()
@@ -79,67 +83,68 @@ def test_migrations_idempotent(tmp_path, monkeypatch):
         "builtin_character_wuthering_waves_aemeath"
     )
     assert aemeath is not None
-    assert aemeath["appearance_tags"][0] == "aemeath_(wuthering_waves)"
+    assert aemeath["identity_tags"] == ["aemeath_(wuthering_waves)"]
+    assert aemeath["appearance_tags"][0] == "wuthering_waves"
     bronya = database.get_character_appearance_preset("builtin_character_hsr_bronya")
     assert bronya is not None
-    assert bronya["appearance_tags"][0] == "bronya_(honkai:_star_rail)"
+    assert bronya["identity_tags"] == ["bronya_(honkai:_star_rail)"]
     ulrich = database.get_character_appearance_preset(
         "builtin_character_azur_lane_ulrich_von_hutten"
     )
     assert ulrich is not None
-    assert ulrich["appearance_tags"][0] == "ulrich_von_hutten_(azur_lane)"
+    assert ulrich["identity_tags"] == ["ulrich_von_hutten_(azur_lane)"]
 
 
     gotz = database.get_character_appearance_preset(
         "builtin_character_azur_lane_gotz_von_berlichingen"
     )
     assert gotz is not None
-    assert gotz["appearance_tags"][0] == "gotz_von_berlichingen_(azur_lane)"
+    assert gotz["identity_tags"] == ["gotz_von_berlichingen_(azur_lane)"]
     napoli = database.get_character_appearance_preset(
         "builtin_character_azur_lane_napoli"
     )
     assert napoli is not None
-    assert napoli["appearance_tags"][0] == "napoli_(azur_lane)"
+    assert napoli["identity_tags"] == ["napoli_(azur_lane)"]
     alsace = database.get_character_appearance_preset(
         "builtin_character_azur_lane_alsace"
     )
     assert alsace is not None
-    assert alsace["appearance_tags"][0] == "alsace_(azur_lane)"
+    assert alsace["identity_tags"] == ["alsace_(azur_lane)"]
     sirius = database.get_character_appearance_preset(
         "builtin_character_azur_lane_sirius"
     )
     assert sirius is not None
-    assert sirius["appearance_tags"][0] == "sirius_(azur_lane)"
+    assert sirius["identity_tags"] == ["sirius_(azur_lane)"]
     sakawa = database.get_character_appearance_preset(
         "builtin_character_azur_lane_sakawa"
     )
     assert sakawa is not None
-    assert sakawa["appearance_tags"][0] == "sakawa_(azur_lane)"
+    assert sakawa["identity_tags"] == ["sakawa_(azur_lane)"]
     asama = database.get_character_appearance_preset(
         "builtin_character_azur_lane_asama"
     )
     assert asama is not None
-    assert asama["appearance_tags"][0] == "asama_(azur_lane)"
+    assert asama["identity_tags"] == ["asama_(azur_lane)"]
     zhen_hai = database.get_character_appearance_preset(
         "builtin_character_azur_lane_zhen_hai"
     )
     assert zhen_hai is not None
-    assert zhen_hai["appearance_tags"][0] == "zhen_hai_(azur_lane)"
+    assert zhen_hai["identity_tags"] == ["zhen_hai_(azur_lane)"]
     maggiore = database.get_character_appearance_preset(
         "builtin_character_azur_lane_maggiore_baracca"
     )
     assert maggiore is not None
-    assert maggiore["appearance_tags"][0] == "maggiore_baracca_(azur_lane)"
+    assert maggiore["identity_tags"] == ["maggiore_baracca_(azur_lane)"]
     typhon = database.get_character_appearance_preset(
         "builtin_character_arknights_typhon"
     )
     assert typhon is not None
-    assert typhon["appearance_tags"][0] == "typhon_(arknights)"
+    assert typhon["identity_tags"] == ["typhon_(arknights)"]
     virtuosa = database.get_character_appearance_preset(
         "builtin_character_arknights_virtuosa"
     )
     assert virtuosa is not None
-    assert virtuosa["appearance_tags"][0] == "virtuosa_(arknights)"
+    assert virtuosa["identity_tags"] == ["virtuosa_(arknights)"]
     assert "black eyes" in virtuosa["appearance_tags"]
     assert "amber pupils" in virtuosa["appearance_tags"]
     assert "amber eyes" not in virtuosa["appearance_tags"]
@@ -147,22 +152,22 @@ def test_migrations_idempotent(tmp_path, monkeypatch):
         "builtin_character_wuthering_waves_dania"
     )
     assert dania is not None
-    assert dania["appearance_tags"][0] == "dania_(wuthering_waves)"
+    assert dania["identity_tags"] == ["dania_(wuthering_waves)"]
     iuno = database.get_character_appearance_preset(
         "builtin_character_wuthering_waves_iuno"
     )
     assert iuno is not None
-    assert iuno["appearance_tags"][0] == "iuno_(wuthering_waves)"
+    assert iuno["identity_tags"] == ["iuno_(wuthering_waves)"]
     female_rover = database.get_character_appearance_preset(
         "builtin_character_wuthering_waves_female_rover"
     )
     assert female_rover is not None
-    assert female_rover["appearance_tags"][0] == "female_rover_(wuthering_waves)"
+    assert female_rover["identity_tags"] == ["female_rover_(wuthering_waves)"]
     typhon_a1 = database.get_character_appearance_preset(
         "builtin_character_fgo_2801100_pretender_a1"
     )
     assert typhon_a1 is not None
-    assert typhon_a1["appearance_tags"][0] == "typhon_ephemeros_(fate)"
+    assert typhon_a1["identity_tags"] == ["typhon_ephemeros_(fate)"]
     assert typhon_a1["work"] == "Fate/Grand Order"
     lady_avalon_a1 = database.get_character_appearance_preset(
         "builtin_character_fgo_2800300_pretender_a1"
@@ -184,6 +189,14 @@ def test_migrations_idempotent(tmp_path, monkeypatch):
         kiyohime = database.get_character_appearance_preset(preset_id)
         assert kiyohime is not None
         assert form_label in kiyohime["name"]
+        assert kiyohime["identity_tags"] == [
+            (
+                "kiyohime_(fate)"
+                if preset_id == "builtin_character_fgo_701300_berserker_a3"
+                or preset_id == "builtin_character_fgo_701300_berserker_a4"
+                else "kiyohime_(lancer)_(fate)"
+            )
+        ]
         assert eye_color in kiyohime["appearance_tags"]
         assert "black dragon horns" in kiyohime["appearance_tags"]
         if preset_id != "builtin_character_fgo_701300_berserker_a4":

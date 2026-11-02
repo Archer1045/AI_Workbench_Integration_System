@@ -51,7 +51,9 @@ function sourceLabel(source: string): string {
 export interface CharacterAppearanceResult {
   character_name?: string;
   work?: string;
+  identity?: string[];
   appearance: string[];
+  visual_appearance?: string[];
   clothing: string[];
   expression: string[];
   full_prompt?: string;
@@ -127,6 +129,7 @@ export default function CharacterAppearanceModal({
   const [presetName, setPresetName] = useState('');
   const [presetWork, setPresetWork] = useState('');
   const [presetCategory, setPresetCategory] = useState('自由备注');
+  const [presetIdentity, setPresetIdentity] = useState('');
   const [presetAppearance, setPresetAppearance] = useState('');
   const [presetClothing, setPresetClothing] = useState('');
   const [presetExpression, setPresetExpression] = useState('');
@@ -232,6 +235,7 @@ export default function CharacterAppearanceModal({
     setPresetName('');
     setPresetWork('');
     setPresetCategory(categories[0] || '自由备注');
+    setPresetIdentity('');
     setPresetAppearance('');
     setPresetClothing('');
     setPresetExpression('');
@@ -248,6 +252,7 @@ export default function CharacterAppearanceModal({
     setPresetName(item.name);
     setPresetWork(item.work);
     setPresetCategory(item.category);
+    setPresetIdentity(item.identity_tags.join(', '));
     setPresetAppearance(item.appearance_tags.join(', '));
     setPresetClothing(item.clothing_tags.join(', '));
     setPresetExpression(item.expression_tags.join(', '));
@@ -269,6 +274,7 @@ export default function CharacterAppearanceModal({
       name: presetName.trim(),
       work: presetWork.trim(),
       category: presetCategory,
+      identity_tags: parseTags(presetIdentity),
       appearance_tags: parseTags(presetAppearance),
       clothing_tags: parseTags(presetClothing),
       expression_tags: parseTags(presetExpression),
@@ -436,6 +442,7 @@ export default function CharacterAppearanceModal({
     setPresetName(characterName.trim());
     setPresetWork(work.trim());
     setPresetCategory('自由备注');
+    setPresetIdentity('');
     setPresetAppearance(appearanceText);
     setPresetClothing(clothingText);
     setPresetExpression(expressionText);
@@ -597,6 +604,12 @@ export default function CharacterAppearanceModal({
                     {!hasThumbnail ? <Tag>无缩略图</Tag> : null}
                   </Space>
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div>
+                      <span className="setting-label" style={{ marginBottom: 0 }}>
+                        身份：
+                      </span>
+                      {item.identity_tags.join(', ') || '无'}
+                    </div>
                     <div>
                       <span className="setting-label" style={{ marginBottom: 0 }}>
                         外貌：
@@ -815,6 +828,15 @@ export default function CharacterAppearanceModal({
               unCheckedChildren="禁用"
             />
           </Space>
+          <div className="setting-field">
+            <span className="setting-label">身份标签</span>
+            <Input.TextArea
+              rows={2}
+              value={presetIdentity}
+              onChange={(event) => setPresetIdentity(event.target.value)}
+              placeholder="例如 kiyohime_(lancer)_(fate)"
+            />
+          </div>
           <div className="setting-field">
             <span className="setting-label">外貌标签</span>
             <Input.TextArea rows={3} value={presetAppearance} onChange={(event) => setPresetAppearance(event.target.value)} />

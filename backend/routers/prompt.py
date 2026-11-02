@@ -1368,6 +1368,7 @@ def _validate_appearance_preset_payload(payload: dict, *, partial: bool = False)
         "name": name,
         "work": work,
         "category": category,
+        "identity_tags": clean_tags("identity_tags"),
         "appearance_tags": clean_tags("appearance_tags"),
         "clothing_tags": clean_tags("clothing_tags"),
         "expression_tags": clean_tags("expression_tags"),
@@ -1496,6 +1497,9 @@ def edit_appearance_preset(preset_id: str, payload: dict = Body(...)) -> dict:
         "name": values["name"] or current["name"],
         "work": values["work"] if "work" in payload else current["work"],
         "category": values["category"] if "category" in payload else current["category"],
+        "identity_tags": (
+            values["identity_tags"] if "identity_tags" in payload else current["identity_tags"]
+        ),
         "appearance_tags": (
             values["appearance_tags"] if "appearance_tags" in payload else current["appearance_tags"]
         ),
@@ -1536,6 +1540,7 @@ def duplicate_appearance_preset(preset_id: str, payload: dict = Body(default={})
         name=str(payload.get("name") or f"{current['name']} 副本").strip(),
         work=current["work"],
         category=current["category"],
+        identity_tags=current["identity_tags"],
         appearance_tags=current["appearance_tags"],
         clothing_tags=current["clothing_tags"],
         expression_tags=current["expression_tags"],
@@ -1585,6 +1590,11 @@ def apply_appearance_preset(preset_id: str, payload: dict = Body(default={})) ->
             status_code=409,
             detail="默认服装套装或固定版本已不存在，请重新关联",
         )
+    identity_tags = list(current["identity_tags"])
+    appearance_tags = list(current["appearance_tags"])
+    combined_appearance = list(
+        dict.fromkeys([*identity_tags, *appearance_tags])
+    )
     default_outfit_set = None
     if current.get("outfit_set_id"):
         default_outfit_set = {
@@ -1604,7 +1614,8 @@ def apply_appearance_preset(preset_id: str, payload: dict = Body(default={})) ->
         "snapshot": {
             "name": current["name"],
             "category": current["category"],
-            "appearance_tags": current["appearance_tags"],
+            "identity_tags": identity_tags,
+            "appearance_tags": appearance_tags,
             "clothing_tags": current["clothing_tags"],
             "expression_tags": current["expression_tags"],
             "outfit_id": current["outfit_id"],
@@ -1615,7 +1626,9 @@ def apply_appearance_preset(preset_id: str, payload: dict = Body(default={})) ->
             "outfit_set_content_hash": current["outfit_set_content_hash"],
             "note": current["note"],
         },
-        "appearance": current["appearance_tags"],
+        "identity": identity_tags,
+        "visual_appearance": appearance_tags,
+        "appearance": combined_appearance,
         "clothing": current["clothing_tags"],
         "expression": current["expression_tags"],
         "default_outfit_id": current["outfit_id"],

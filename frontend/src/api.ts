@@ -1333,6 +1333,7 @@ export interface CharacterAppearancePreset {
   name: string;
   work: string;
   category: string;
+  identity_tags: string[];
   appearance_tags: string[];
   clothing_tags: string[];
   expression_tags: string[];
@@ -1373,6 +1374,7 @@ export interface CharacterAppearancePresetApplyResult {
   snapshot: {
     name: string;
     category: string;
+    identity_tags: string[];
     appearance_tags: string[];
     clothing_tags: string[];
     expression_tags: string[];
@@ -1384,6 +1386,8 @@ export interface CharacterAppearancePresetApplyResult {
     outfit_set_content_hash?: string;
     note: string;
   };
+  identity: string[];
+  visual_appearance: string[];
   appearance: string[];
   clothing: string[];
   expression: string[];

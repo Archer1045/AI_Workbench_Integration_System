@@ -234,6 +234,7 @@ CREATE TABLE IF NOT EXISTS character_appearance_presets (
     name TEXT NOT NULL,
     work TEXT NOT NULL DEFAULT '',
     category TEXT NOT NULL DEFAULT '自由备注',
+    identity_tags TEXT NOT NULL DEFAULT '[]',
     appearance_tags TEXT NOT NULL DEFAULT '[]',
     clothing_tags TEXT NOT NULL DEFAULT '[]',
             expression_tags TEXT NOT NULL DEFAULT '[]',
@@ -306,7 +307,7 @@ _TABLES = {
 }
 
 # SQLite 版本化迁移：新库与旧库都从 user_version=0 开始依次执行。
-SCHEMA_VERSION = 35
+SCHEMA_VERSION = 36
 
 
 def get_connection() -> sqlite3.Connection:
@@ -1287,6 +1288,40 @@ def _migration_035_gallery_pose_links(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_036_character_identity_tags(conn: sqlite3.Connection) -> None:
+    """Separate canonical character identity tags from visual appearance."""
+    if "identity_tags" not in _table_columns(conn, "character_appearance_presets"):
+        conn.execute(
+            "ALTER TABLE character_appearance_presets "
+            "ADD COLUMN identity_tags TEXT NOT NULL DEFAULT '[]'"
+        )
+    rows = conn.execute(
+        """
+        SELECT id, work, appearance_tags
+        FROM character_appearance_presets
+        """
+    ).fetchall()
+    for row in rows:
+        identity, appearance = _split_identity_tags(
+            [],
+            _decode_json_tags(row["appearance_tags"]),
+            str(row["work"] or ""),
+        )
+        conn.execute(
+            """
+            UPDATE character_appearance_presets
+            SET identity_tags = ?, appearance_tags = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                json.dumps(identity, ensure_ascii=False),
+                json.dumps(appearance, ensure_ascii=False),
+                now_iso(),
+                int(row["id"]),
+            ),
+        )
+
+
 _MIGRATIONS = (
     _migration_001_compat,
     _migration_002_background_jobs,
@@ -1323,6 +1358,7 @@ _MIGRATIONS = (
     _migration_033_character_outfit_set_links,
     _migration_034_managed_reference_galleries,
     _migration_035_gallery_pose_links,
+    _migration_036_character_identity_tags,
 )
 
 
@@ -3032,15 +3068,61 @@ def _decode_json_tags(value) -> list[str]:
     return _tag_values(decoded)
 
 
+_NON_IDENTITY_TAGS = {
+    "1girl",
+    "1boy",
+    "solo",
+    "character",
+    "original",
+    "unknown",
+}
+
+
+def _infer_identity_tag(appearance_tags, work: str) -> list[str]:
+    tags = _tag_values(appearance_tags)
+    if not str(work or "").strip() or not tags:
+        return []
+    first = tags[0].strip()
+    if (
+        not first
+        or not first.isascii()
+        or any(char.isspace() for char in first)
+        or first.casefold() in _NON_IDENTITY_TAGS
+    ):
+        return []
+    return [first]
+
+
+def _split_identity_tags(
+    identity_tags,
+    appearance_tags,
+    work: str,
+) -> tuple[list[str], list[str]]:
+    identity = _decode_json_tags(identity_tags)
+    appearance = _decode_json_tags(appearance_tags)
+    if not identity:
+        identity = _infer_identity_tag(appearance, work)
+    identity_keys = {tag.casefold() for tag in identity}
+    visual = [tag for tag in appearance if tag.casefold() not in identity_keys]
+    return identity, visual
+
+
 def _appearance_preset_row(row: sqlite3.Row) -> dict:
     data = dict(row)
+    work = str(data["work"] or "")
+    identity, appearance = _split_identity_tags(
+        data.get("identity_tags"),
+        data["appearance_tags"],
+        work,
+    )
     return {
         "id": int(data["id"]),
         "preset_id": str(data["preset_id"]),
         "name": str(data["name"]),
-        "work": str(data["work"] or ""),
+        "work": work,
         "category": str(data["category"] or "自由备注"),
-        "appearance_tags": _decode_json_tags(data["appearance_tags"]),
+        "identity_tags": identity,
+        "appearance_tags": appearance,
         "clothing_tags": _decode_json_tags(data["clothing_tags"]),
         "expression_tags": _decode_json_tags(data["expression_tags"]),
         "outfit_id": str(data.get("outfit_id") or ""),
@@ -3078,9 +3160,10 @@ def list_character_appearance_presets(
         clauses.append(
             "(p.name LIKE ? OR p.work LIKE ? OR p.outfit_id LIKE ? "
             "OR p.outfit_set_id LIKE ? OR p.note LIKE ? "
-            "OR p.appearance_tags LIKE ? OR p.clothing_tags LIKE ? OR p.expression_tags LIKE ?)"
+            "OR p.identity_tags LIKE ? OR p.appearance_tags LIKE ? "
+            "OR p.clothing_tags LIKE ? OR p.expression_tags LIKE ?)"
         )
-        params.extend([like, like, like, like, like, like, like, like])
+        params.extend([like, like, like, like, like, like, like, like, like])
     if category.strip():
         clauses.append("p.category = ?")
         params.append(category.strip())
@@ -3160,6 +3243,7 @@ def create_character_appearance_preset(
     appearance_tags,
     clothing_tags,
     expression_tags,
+    identity_tags=None,
     outfit_id: str = "",
     outfit_set_id: str = "",
     outfit_set_version: int = 0,
@@ -3167,22 +3251,29 @@ def create_character_appearance_preset(
     source: str = "user",
     enabled: bool = True,
 ) -> dict:
+    identity, appearance = _split_identity_tags(
+        identity_tags,
+        appearance_tags,
+        work,
+    )
     now = now_iso()
     with get_connection() as conn:
         cursor = conn.execute(
             """
             INSERT INTO character_appearance_presets (
-                preset_id, name, work, category, appearance_tags, clothing_tags,
-                expression_tags, outfit_id, outfit_set_id, outfit_set_version,
-                note, source, version, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+                preset_id, name, work, category, identity_tags, appearance_tags,
+                clothing_tags, expression_tags, outfit_id, outfit_set_id,
+                outfit_set_version, note, source, version, enabled,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
             """,
             (
                 preset_id,
                 name,
                 work,
                 category,
-                json.dumps(_tag_values(appearance_tags), ensure_ascii=False),
+                json.dumps(identity, ensure_ascii=False),
+                json.dumps(appearance, ensure_ascii=False),
                 json.dumps(_tag_values(clothing_tags), ensure_ascii=False),
                 json.dumps(_tag_values(expression_tags), ensure_ascii=False),
                 str(outfit_id or "").strip(),
@@ -3212,6 +3303,7 @@ def update_character_appearance_preset(
     appearance_tags,
     clothing_tags,
     expression_tags,
+    identity_tags=None,
     outfit_id: str = "",
     outfit_set_id: str = "",
     outfit_set_version: int = 0,
@@ -3223,23 +3315,30 @@ def update_character_appearance_preset(
     current = get_character_appearance_preset(preset_id)
     if not current:
         raise KeyError(preset_id)
+    identity, appearance = _split_identity_tags(
+        identity_tags,
+        appearance_tags,
+        work,
+    )
     now = now_iso()
     next_version = int(current["version"]) + 1
     with get_connection() as conn:
         cursor = conn.execute(
             """
             INSERT INTO character_appearance_presets (
-                preset_id, name, work, category, appearance_tags, clothing_tags,
-                expression_tags, outfit_id, outfit_set_id, outfit_set_version,
-                note, source, version, enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                preset_id, name, work, category, identity_tags, appearance_tags,
+                clothing_tags, expression_tags, outfit_id, outfit_set_id,
+                outfit_set_version, note, source, version, enabled,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 preset_id,
                 name,
                 work,
                 category,
-                json.dumps(_tag_values(appearance_tags), ensure_ascii=False),
+                json.dumps(identity, ensure_ascii=False),
+                json.dumps(appearance, ensure_ascii=False),
                 json.dumps(_tag_values(clothing_tags), ensure_ascii=False),
                 json.dumps(_tag_values(expression_tags), ensure_ascii=False),
                 str(outfit_id or "").strip(),

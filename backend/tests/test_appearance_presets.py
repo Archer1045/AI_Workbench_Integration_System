@@ -1,6 +1,10 @@
 """Appearance preset CRUD, application, import, and reference safety tests."""
 from __future__ import annotations
 
+import json
+
+import database
+
 
 def _create_preset(client, preset_id: str = "test_appearance_preset"):
     response = client.post(
@@ -56,6 +60,113 @@ def test_appearance_preset_crud_and_versioning(client):
     )
     assert old_version.status_code == 200
     assert old_version.json()["item"]["name"] == "Test Appearance"
+
+
+def test_identity_tags_are_separate_from_visual_appearance(client):
+    created = client.post(
+        "/api/prompt-agent/appearance-presets",
+        json={
+            "preset_id": "test_identity_separation",
+            "name": "Identity Test",
+            "work": "Test Work",
+            "category": "角色",
+            "identity_tags": ["identity_test_(test_work)"],
+            "appearance_tags": ["identity_test_(test_work)", "silver hair"],
+            "clothing_tags": [],
+            "expression_tags": [],
+        },
+    )
+    assert created.status_code == 200
+    item = created.json()["item"]
+    assert item["identity_tags"] == ["identity_test_(test_work)"]
+    assert item["appearance_tags"] == ["silver hair"]
+
+    applied = client.post(
+        f"/api/prompt-agent/appearance-presets/{item['preset_id']}/apply",
+        json={},
+    )
+    assert applied.status_code == 200
+    payload = applied.json()
+    assert payload["identity"] == ["identity_test_(test_work)"]
+    assert payload["visual_appearance"] == ["silver hair"]
+    assert payload["appearance"] == ["identity_test_(test_work)", "silver hair"]
+
+    edited = client.put(
+        f"/api/prompt-agent/appearance-presets/{item['preset_id']}",
+        json={"identity_tags": ["identity_test_v2_(test_work)"]},
+    )
+    assert edited.status_code == 200
+    assert edited.json()["item"]["identity_tags"] == [
+        "identity_test_v2_(test_work)"
+    ]
+    client.delete(f"/api/prompt-agent/appearance-presets/{item['preset_id']}")
+
+
+def test_migration_backfills_identity_tags_without_guessing_visual_tags(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(database, "DB_PATH", tmp_path / "identity_migration.db")
+    with database.get_connection() as conn:
+        conn.execute(
+            """
+            CREATE TABLE character_appearance_presets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                preset_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                work TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '角色',
+                appearance_tags TEXT NOT NULL DEFAULT '[]',
+                updated_at TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        rows = [
+            (
+                "known",
+                "known_character_(work)",
+                '["known_character_(work)", "work", "long hair"]',
+            ),
+            (
+                "original",
+                "1girl",
+                '["1girl", "long hair", "blue eyes"]',
+            ),
+        ]
+        for preset_id, first, tags in rows:
+            conn.execute(
+                """
+                INSERT INTO character_appearance_presets (
+                    preset_id, name, work, appearance_tags
+                ) VALUES (?, ?, 'Work', ?)
+                """,
+                (preset_id, preset_id, tags),
+            )
+
+        database._migration_036_character_identity_tags(conn)
+        known = conn.execute(
+            """
+            SELECT identity_tags, appearance_tags
+            FROM character_appearance_presets
+            WHERE preset_id = 'known'
+            """
+        ).fetchone()
+        original = conn.execute(
+            """
+            SELECT identity_tags, appearance_tags
+            FROM character_appearance_presets
+            WHERE preset_id = 'original'
+            """
+        ).fetchone()
+
+    assert json.loads(known["identity_tags"]) == ["known_character_(work)"]
+    assert json.loads(known["appearance_tags"]) == ["work", "long hair"]
+    assert json.loads(original["identity_tags"]) == []
+    assert json.loads(original["appearance_tags"]) == [
+        "1girl",
+        "long hair",
+        "blue eyes",
+    ]
 
 
 def test_appearance_preset_work_filter_and_works(client):

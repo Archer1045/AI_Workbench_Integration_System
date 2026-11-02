@@ -81,6 +81,10 @@ describe('CharacterAppearanceModal default outfit set binding', () => {
       target: { value: '测试角色' },
     });
     fireEvent.change(
+      screen.getByPlaceholderText('例如 kiyohime_(lancer)_(fate)'),
+      { target: { value: 'kiyohime_(lancer)_(fate)' } },
+    );
+    fireEvent.change(
       screen.getByPlaceholderText('例如 outfit_genshin_columbina_default'),
       { target: { value: 'outfit_atomic_default' } },
     );
@@ -103,6 +107,7 @@ describe('CharacterAppearanceModal default outfit set binding', () => {
 
     await waitFor(() => expect(apiMocks.post).toHaveBeenCalled());
     expect(apiMocks.post.mock.calls[0][1]).toMatchObject({
+      identity_tags: ['kiyohime_(lancer)_(fate)'],
       outfit_id: 'outfit_atomic_default',
       outfit_set_id: 'outfit_campus_cream',
       outfit_set_version: 2,

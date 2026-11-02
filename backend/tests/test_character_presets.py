@@ -417,7 +417,8 @@ def test_character_presets_are_queryable_and_apply_without_clothing(client) -> N
     )
     assert applied.status_code == 200
     payload = applied.json()
-    assert payload["appearance"]
+    assert payload["identity"]
+    assert payload["appearance"] == payload["identity"] + payload["visual_appearance"]
     assert payload["clothing"] == []
     assert payload["expression"] == []
 
@@ -426,8 +427,8 @@ def test_character_presets_are_queryable_and_apply_without_clothing(client) -> N
     ).json()["item"]
     assert columbina["outfit_id"] == "outfit_genshin_columbina_default"
     assert columbina["outfit_name"] == "哥伦比娅 默认服装"
+    assert columbina["identity_tags"] == ["columbina_(genshin_impact)"]
     assert columbina["appearance_tags"] == [
-        "columbina_(genshin_impact)",
         "genshin_impact",
         "1girl",
         "solo",
@@ -439,6 +440,7 @@ def test_character_presets_are_queryable_and_apply_without_clothing(client) -> N
         "/api/prompt-agent/appearance-presets/builtin_character_genshin_columbina/apply",
         json={},
     ).json()
+    assert applied_columbina["identity"] == ["columbina_(genshin_impact)"]
     assert applied_columbina["clothing"] == []
     assert applied_columbina["default_outfit_id"] == "outfit_genshin_columbina_default"
     assert applied_columbina["default_outfit_name"] == "哥伦比娅 默认服装"
