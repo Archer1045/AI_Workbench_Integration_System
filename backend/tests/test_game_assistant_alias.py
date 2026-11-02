@@ -126,7 +126,7 @@ def test_guide_extraction_feeds_aliases_through_the_table() -> None:
 
     source = Path("game_assistant/source_service.py").read_text(encoding="utf-8")
 
-    assert "alias_mod.apply_to_text(record.text" in source
+    assert "alias_mod.apply_to_text(extraction_text" in source
 
 
 def _skills_payload() -> dict:

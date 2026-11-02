@@ -207,8 +207,13 @@ def test_events_record_cache_hits_and_failures(tmp_path: Path, monkeypatch) -> N
     assert all("cache me" not in json.dumps(event, ensure_ascii=False) for event in events)
 
 
-def test_settings_api_does_not_return_api_key(client, monkeypatch) -> None:
-    monkeypatch.setattr(config, "WEB_TOOLS_SECRETS_PATH", Path("unused.json"))
+def test_settings_api_does_not_return_api_key(client, tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(config, "WEB_TOOLS_SECRETS_PATH", tmp_path / "web_secrets.json")
+    monkeypatch.setattr(
+        config,
+        "GAME_ASSISTANT_SECRETS_PATH",
+        tmp_path / "game_assistant_secrets.json",
+    )
     reset_web_tools_service()
     response = client.get("/api/settings/web-tools")
     assert response.status_code == 200

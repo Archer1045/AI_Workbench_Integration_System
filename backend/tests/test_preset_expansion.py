@@ -12,11 +12,11 @@ import preset_composer
 
 
 def test_scene_presets_are_static_and_humanoid_only() -> None:
-    assert len(scene_presets.SCENE_PRESETS) == 218
+    assert len(scene_presets.SCENE_PRESETS) == 252
     ids = [item["id"] for item in scene_presets.SCENE_PRESETS]
     assert len(ids) == len(set(ids))
-    assert sum(item["rating"] == "普通" for item in scene_presets.SCENE_PRESETS) == 81
-    assert sum(item["rating"] == "R18" for item in scene_presets.SCENE_PRESETS) == 137
+    assert sum(item["rating"] == "普通" for item in scene_presets.SCENE_PRESETS) == 102
+    assert sum(item["rating"] == "R18" for item in scene_presets.SCENE_PRESETS) == 150
     assert {
         "scene_commuter_platform",
         "scene_pedestrian_overpass",
@@ -123,17 +123,17 @@ def test_scene_presets_are_static_and_humanoid_only() -> None:
 
 
 def test_scene_prompt_variants_separate_empty_and_occupied_people_policy() -> None:
-    assert len(scene_presets.SCENE_PRESETS) == 218
+    assert len(scene_presets.SCENE_PRESETS) == 252
     empty_items = [
         item
         for item in scene_presets.SCENE_PRESETS
         if item["people_policy"] == "empty"
     ]
-    assert len(empty_items) == 104
+    assert len(empty_items) == 138
     assert sum(
         bool(scene_presets.PEOPLE_EXCLUSION_PATTERN.search(item["draw_prompt"]))
         for item in scene_presets.SCENE_PRESETS
-    ) == 104
+    ) == 138
     for item in scene_presets.SCENE_PRESETS:
         assert item["people_policy"] in {"empty", "occupied"}
         assert item["empty_scene_prompt"]
@@ -168,11 +168,11 @@ def test_multi_pose_people_count_and_role_slots_are_consistent() -> None:
         for item in prompt_agent.POSE_PRESETS
         if item.get("people") in {"双人", "多人"}
     ]
-    assert len(multi_poses) == 303
-    assert sum(item["people"] == "双人" for item in multi_poses) == 280
-    assert sum(item["people"] == "多人" for item in multi_poses) == 23
-    assert sum(len(item["role_slots"]) == 2 for item in multi_poses) == 280
-    assert sum(len(item["role_slots"]) == 3 for item in multi_poses) == 17
+    assert len(multi_poses) == 319
+    assert sum(item["people"] == "双人" for item in multi_poses) == 291
+    assert sum(item["people"] == "多人" for item in multi_poses) == 28
+    assert sum(len(item["role_slots"]) == 2 for item in multi_poses) == 291
+    assert sum(len(item["role_slots"]) == 3 for item in multi_poses) == 22
     assert sum(len(item["role_slots"]) == 4 for item in multi_poses) == 6
     number_words = {
         2: "two",
@@ -521,7 +521,7 @@ def test_scene_api_and_restriction(client, monkeypatch) -> None:
     response = client.get("/api/prompt-agent/scene-presets")
     assert response.status_code == 200
     body = response.json()
-    assert body["total"] == 218
+    assert body["total"] == 252
     assert body["restricted"] is False
     assert body["categories"]
     assert body["items"][0]["image"] == "/scene-presets/scene_rope_bed.webp"
@@ -535,7 +535,7 @@ def test_scene_api_and_restriction(client, monkeypatch) -> None:
     monkeypatch.setattr(prompt_router, "content_restriction_enabled", lambda: True)
     restricted = client.get("/api/prompt-agent/scene-presets").json()
     assert restricted["restricted"] is True
-    assert restricted["total"] == 81
+    assert restricted["total"] == 102
     assert all(item["rating"] == "普通" for item in restricted["items"])
 
 
@@ -561,9 +561,9 @@ def test_body_modification_api_and_restriction(client, monkeypatch) -> None:
 def test_preset_catalog_counts_and_restriction(client, monkeypatch) -> None:
     catalog = client.get("/api/prompt-agent/preset-catalog").json()
     assert catalog["restricted"] is False
-    assert len(catalog["poses"]) == 446
-    assert len(catalog["clothing"]) == 1013
-    assert len(catalog["scenes"]) == 218
+    assert len(catalog["poses"]) == 489
+    assert len(catalog["clothing"]) == 1123
+    assert len(catalog["scenes"]) == 252
     assert len(catalog["body_modifications"]) == 27
     assert len(catalog["expansions"]) == 8
     assert len(catalog["toys"]) == 13
@@ -584,13 +584,13 @@ def test_preset_catalog_counts_and_restriction(client, monkeypatch) -> None:
     monkeypatch.setattr(prompt_router, "content_restriction_enabled", lambda: True)
     restricted = client.get("/api/prompt-agent/preset-catalog").json()
     assert restricted["restricted"] is True
-    assert len(restricted["scenes"]) == 81
+    assert len(restricted["scenes"]) == 102
     assert all(item["rating"] == "普通" for item in restricted["scenes"])
     assert len(restricted["body_modifications"]) == 18
 
 
 def test_solo_r18_pose_expansion_is_complete_and_solo_safe() -> None:
-    assert len(prompt_agent.SOLO_R18_POSE_IDS) == 127
+    assert len(prompt_agent.SOLO_R18_POSE_IDS) == 138
     assert len(prompt_agent.SOLO_R18_POSE_IDS) == len(set(prompt_agent.SOLO_R18_POSE_IDS))
     expected_sentinels = {
         "solo_back_knees_up_touch",
@@ -860,8 +860,8 @@ def test_new_intimate_and_pain_play_expansion_is_complete() -> None:
     by_id = {item["id"]: item for item in prompt_agent.POSE_PRESETS}
     assert expected_duo_ids <= set(by_id)
     assert set(expected_new_pain_tags) <= set(by_id)
-    assert len(prompt_agent.POSE_PRESETS) == 446
-    assert len({item["id"] for item in prompt_agent.POSE_PRESETS}) == 446
+    assert len(prompt_agent.POSE_PRESETS) == 489
+    assert len({item["id"] for item in prompt_agent.POSE_PRESETS}) == 489
 
     for preset_id in expected_duo_ids:
         item = by_id[preset_id]

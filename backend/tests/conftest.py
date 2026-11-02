@@ -23,6 +23,26 @@ def isolate_task_registry():
         task_registry._REGISTRY.clear()
 
 
+@pytest.fixture(autouse=True)
+def isolate_secret_stores(tmp_path, monkeypatch):
+    """Never let tests read DPAPI blobs from the live user profile."""
+    import config
+    import game_assistant.provider_settings as provider_settings
+    import web_tools
+
+    game_config = tmp_path / "game_assistant_config"
+    web_config = tmp_path / "app_config"
+    monkeypatch.setattr(config, "GAME_ASSISTANT_CONFIG_DIR", game_config)
+    monkeypatch.setattr(config, "GAME_ASSISTANT_SECRETS_PATH", game_config / "secrets.json")
+    monkeypatch.setattr(config, "WEB_TOOLS_CONFIG_DIR", web_config)
+    monkeypatch.setattr(config, "WEB_TOOLS_SECRETS_PATH", web_config / "secrets.json")
+    provider_settings.reset_provider_settings_service()
+    web_tools.reset_web_tools_service()
+    yield
+    provider_settings.reset_provider_settings_service()
+    web_tools.reset_web_tools_service()
+
+
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     """提供不触碰真实数据库、不依赖外部服务的 FastAPI TestClient。"""

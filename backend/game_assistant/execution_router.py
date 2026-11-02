@@ -705,7 +705,7 @@ def stop_run() -> dict[str, Any]:
         _STATE.exit_code = process.returncode
     # Windows 上 terminate()/kill() 不保证子进程执行 finally，DeviceLease.release()
     # 可能来不及跑；这里按 run_id 主动释放，避免下一次点击「开始」在 120 秒 TTL 内
-    # 被自己的旧租约挡住（2026-10-19 实测：停止后立刻重开 ⇒ 资源冲突 ADB+模拟器）。
+    # 被自己的旧租约挡住（2026-10-19 实测：停止后立刻重开 ⇒ 设备资源冲突）。
     released = 0
     try:
         import task_resources

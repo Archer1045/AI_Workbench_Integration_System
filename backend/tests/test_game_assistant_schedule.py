@@ -251,6 +251,15 @@ def test_refresh_from_official_endpoint(client, schedule_env, monkeypatch) -> No
 def test_schedule_endpoint_carries_upcoming_and_japanese_reference(client, schedule_env, monkeypatch) -> None:
     """`GET /schedule` 给页面的三样东西：全部条目、**下个活动**（confirmed 且未结束）、日服参考。"""
     from game_assistant import mooncell_events
+    from game_assistant import router as game_assistant_router
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            value = datetime(2026, 10, 23, 18, 0, tzinfo=TZ)
+            return value.astimezone(tz) if tz is not None else value
+
+    monkeypatch.setattr(game_assistant_router, "datetime", FixedDateTime)
 
     schedule.upsert_event(
         {

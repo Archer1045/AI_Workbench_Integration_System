@@ -30,7 +30,11 @@ def test_expansion_presets_api(client) -> None:
     assert body["categories"]
     assert body["states"]
     assert all(item["rating"] == "R18" for item in body["items"])
-    assert all(item["has_image"] is False for item in body["items"])
+    assert all(isinstance(item["has_image"], bool) for item in body["items"])
+    assert all(
+        not item["has_image"] or item["image"].startswith("/expansion-presets/")
+        for item in body["items"]
+    )
 
 
 def test_expansion_presets_are_in_catalog_and_composition(client) -> None:
