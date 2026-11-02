@@ -25,6 +25,8 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import {
   api,
   type DrawImageRecord,
+  type ExternalGalleryItem,
+  type ExternalGalleryKind,
   type InpaintJob,
   type InpaintResult,
   type InpaintSource,
@@ -33,6 +35,7 @@ import {
   type PromptDocumentV1,
 } from '../api';
 import { getRuntimeConfig } from '../stores/runtimeConfig';
+import ExternalGalleryDrawer from './ExternalGalleryDrawer';
 import ImageLibraryDrawer from './ImageLibraryDrawer';
 
 interface SourceState {
@@ -99,6 +102,7 @@ export default function InpaintPanel({
   const [sourceImage, setSourceImage] = useState<HTMLImageElement | null>(null);
   const [sourceLoading, setSourceLoading] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [externalGalleryOpen, setExternalGalleryOpen] = useState(false);
   const [jobId, setJobId] = useState('');
   const [job, setJob] = useState<InpaintJob | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -275,6 +279,44 @@ export default function InpaintPanel({
       { recordId: record.id, label: `图片库 #${record.id}` },
     );
     setLibraryOpen(false);
+  };
+
+  const handleExternalGallerySelect = async (
+    kind: ExternalGalleryKind,
+    item: ExternalGalleryItem,
+  ) => {
+    setSourceLoading(true);
+    try {
+      const response = await fetch(item.image_url, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`外部素材读取失败（HTTP ${response.status}）`);
+      }
+      const blob = await response.blob();
+      const extension =
+        item.path.split('.').pop()?.toLowerCase() || 'png';
+      const file = new File([blob], `${item.name || 'reference'}.${extension}`, {
+        type: blob.type || `image/${extension === 'jpg' ? 'jpeg' : extension}`,
+      });
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post<InpaintSource>(
+        '/draw/inpaint/sources',
+        form,
+      );
+      loadSource(
+        data.preview_url,
+        data.working_width,
+        data.working_height,
+        {
+          sourceId: data.source_id,
+          label: `${kind === 'pose' ? '姿势库' : '服装库'} · ${item.name}`,
+        },
+      );
+      setExternalGalleryOpen(false);
+    } catch (error) {
+      setSourceLoading(false);
+      throw error;
+    }
   };
 
   const pointFromEvent = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -458,6 +500,12 @@ export default function InpaintPanel({
           </Button>
           <Button icon={<PictureOutlined />} onClick={() => setLibraryOpen(true)}>
             从图片库选择
+          </Button>
+          <Button
+            icon={<PictureOutlined />}
+            onClick={() => setExternalGalleryOpen(true)}
+          >
+            外部参考图库
           </Button>
         </Space>
       </div>
@@ -703,6 +751,11 @@ export default function InpaintPanel({
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         onSelect={handleLibrarySelect}
+      />
+      <ExternalGalleryDrawer
+        open={externalGalleryOpen}
+        onClose={() => setExternalGalleryOpen(false)}
+        onSelect={handleExternalGallerySelect}
       />
     </div>
   );

@@ -23,6 +23,10 @@ COMFY_OUTPUT_DIR = config.COMFY_DIR / "output"
 VIDEO_EXTS = {".webm", ".mp4", ".mov", ".gif", ".avi"}
 
 
+class VideoGenerationStopped(RuntimeError):
+    """Raised when the user stops a ComfyUI segment."""
+
+
 def _param(params: dict, key: str, default):
     value = params.get(key)
     return default if value is None or value == "" else value
@@ -205,16 +209,23 @@ def request_stop(job_id: str) -> dict:
     return {"job_id": job_id, "status": "stopping"}
 
 
-def run_video_job(job_id: str, params: dict) -> None:
-    """后台执行视频任务并更新 video_records/background_jobs。"""
-    frames = int(_param(params, "frames", config.VIDEO_DEFAULT_FRAMES))
+def generate_video_output(
+    job_id: str,
+    params: dict,
+    *,
+    progress=None,
+    should_stop=None,
+) -> Path:
+    """Generate one ComfyUI video segment without owning database/task state."""
     seed_value = _param(params, "seed", None)
     seed = int(seed_value if seed_value is not None else random.randint(0, 2**63 - 1))
-    prefix = f"video_{job_id[:8]}_{seed}"
-    started = time.time()
+    prefix = str(
+        params.get("filename_prefix") or f"video_{job_id[:8]}_{seed}"
+    )
     comfy_keyframe: Path | None = None
+    if progress:
+        progress("准备关键帧与工作流")
     try:
-        task_registry.update("video", job_id, total=frames, done=0, current="准备关键帧与工作流")
         image_name, comfy_keyframe = _prepare_comfy_keyframe(str(params.get("keyframe_name") or ""), job_id)
         params = dict(params)
         params["seed"] = seed
@@ -222,7 +233,8 @@ def run_video_job(job_id: str, params: dict) -> None:
         params["filename_prefix"] = prefix
         graph = build_video_workflow(params)
 
-        task_registry.update("video", job_id, current="提交 ComfyUI")
+        if progress:
+            progress("提交 ComfyUI")
         response = requests.post(
             COMFY_URL + "/prompt",
             json={"prompt": graph, "client_id": uuid.uuid4().hex},
@@ -233,17 +245,16 @@ def run_video_job(job_id: str, params: dict) -> None:
         if not prompt_id:
             raise RuntimeError("ComfyUI 未返回 prompt_id")
 
-        task_registry.update("video", job_id, current="生成中（预计每 5 秒刷新）")
+        if progress:
+            progress("生成中（预计每 5 秒刷新）")
         deadline = time.time() + int(
             _param(params, "timeout_seconds", config.VIDEO_TIMEOUT_SECONDS)
         )
         history_entry = None
         while time.time() < deadline:
-            if _stop_requested(job_id):
+            if should_stop and should_stop():
                 _interrupt_comfy()
-                database.update_video_record_result(job_id, "stopped", error="用户取消")
-                task_registry.finish("video", job_id, "stopped", "用户取消")
-                return
+                raise VideoGenerationStopped("用户取消")
             history = requests.get(COMFY_URL + f"/history/{prompt_id}", timeout=10).json()
             entry = (history or {}).get(prompt_id)
             if entry:
@@ -258,7 +269,41 @@ def run_video_job(job_id: str, params: dict) -> None:
         if history_entry is None:
             raise TimeoutError("视频生成超时")
 
-        target = _download_or_copy_output(history_entry, VIDEO_OUTPUT_DIR, prefix)
+        return _download_or_copy_output(
+            history_entry,
+            Path(params.get("output_dir") or VIDEO_OUTPUT_DIR),
+            prefix,
+        )
+    finally:
+        if comfy_keyframe and comfy_keyframe.exists():
+            try:
+                comfy_keyframe.unlink()
+            except OSError:
+                pass
+
+
+def run_video_job(job_id: str, params: dict) -> None:
+    """后台执行单段视频任务并更新 video_records/background_jobs."""
+    frames = int(_param(params, "frames", config.VIDEO_DEFAULT_FRAMES))
+    started = time.time()
+    try:
+        task_registry.update(
+            "video",
+            job_id,
+            total=frames,
+            done=0,
+            current="准备关键帧与工作流",
+        )
+        target = generate_video_output(
+            job_id,
+            params,
+            progress=lambda current: task_registry.update(
+                "video",
+                job_id,
+                current=current,
+            ),
+            should_stop=lambda: _stop_requested(job_id),
+        )
         duration_seconds = round(time.time() - started, 1)
         database.update_video_record_result(
             job_id,
@@ -274,12 +319,9 @@ def run_video_job(job_id: str, params: dict) -> None:
             current=target.name,
         )
         task_registry.finish("video", job_id, "done")
+    except VideoGenerationStopped:
+        database.update_video_record_result(job_id, "stopped", error="用户取消")
+        task_registry.finish("video", job_id, "stopped", "用户取消")
     except Exception as exc:  # noqa: BLE001 - 后台任务需要统一落终态
         database.update_video_record_result(job_id, "error", error=str(exc)[-1000:])
         task_registry.finish("video", job_id, "error", str(exc)[-1000:])
-    finally:
-        if comfy_keyframe and comfy_keyframe.exists():
-            try:
-                comfy_keyframe.unlink()
-            except OSError:
-                pass

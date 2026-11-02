@@ -34,6 +34,8 @@ import {
 } from '../api';
 import { getRuntimeConfig } from '../stores/runtimeConfig';
 import { settingsStore } from '../stores/settings';
+import LongVideoPanel from './LongVideoPanel';
+import StoryboardToolsPanel from './StoryboardToolsPanel';
 
 const { TextArea } = Input;
 const VIDEO_TASK_KEY = 'rider-studio:video-task-v1';
@@ -162,6 +164,9 @@ export default function VideoPanel() {
   const [library, setLibrary] = useState<VideoRecord[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [workspaceMode, setWorkspaceMode] = useState<
+    'generate' | 'long' | 'storyboard'
+  >('generate');
   const jobIdRef = useRef('');
 
   const loadKeyframes = async () => {
@@ -469,7 +474,24 @@ export default function VideoPanel() {
   ];
 
   return (
-    <div className="panel-box video-layout">
+    <div className="video-workspace-shell">
+      <div className="video-workspace-switch">
+        <Segmented
+          value={workspaceMode}
+          options={[
+            { value: 'generate', label: '单镜头生成' },
+            { value: 'long', label: '长视频分段' },
+            { value: 'storyboard', label: '分镜与合并' },
+          ]}
+          onChange={(value) =>
+            setWorkspaceMode(value as 'generate' | 'long' | 'storyboard')
+          }
+        />
+      </div>
+      <div
+        className="panel-box video-layout"
+        hidden={workspaceMode !== 'generate'}
+      >
       <div className="video-create">
         <div className="video-block">
           <div className="video-block-header">
@@ -690,6 +712,13 @@ export default function VideoPanel() {
             scroll={{ x: 760 }}
           />
         </div>
+      </div>
+      </div>
+      <div hidden={workspaceMode !== 'long'}>
+        <LongVideoPanel />
+      </div>
+      <div hidden={workspaceMode !== 'storyboard'}>
+        <StoryboardToolsPanel active={workspaceMode === 'storyboard'} />
       </div>
     </div>
   );

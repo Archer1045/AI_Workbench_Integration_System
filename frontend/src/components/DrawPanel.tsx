@@ -49,6 +49,11 @@ import {
   type DrawPromptFragment,
 } from '../drawPromptFragments';
 import {
+  canvasPresetOptions,
+  normalizeGenerationSize,
+  selectedCanvasPreset,
+} from '../generationSpecs';
+import {
   loadDrawPromptHistory,
   recordDrawPromptVersion,
   saveDrawPromptHistory,
@@ -490,6 +495,7 @@ export default function DrawPanel({
   const [lorasList, setLorasList] = useState<LoraItem[]>([]);
   const [lorasLoading, setLorasLoading] = useState(false);
   const [modelsList, setModelsList] = useState<ModelItem[]>([]);
+  const activeModelSpec = modelsList.find((item) => item.name === model)?.spec || null;
   const [groupTagMaps, setGroupTagMaps] = useState<Record<string, Record<string, string>>>({});
   const [negTagMap, setNegTagMap] = useState<Record<string, string>>({});
   const [elapsed, setElapsed] = useState(0);
@@ -600,6 +606,49 @@ export default function DrawPanel({
   if (!sizeOptions.some((item) => item.value === `${width}x${height}`)) {
     sizeOptions.unshift({ label: `当前 ${width}×${height}`, value: `${width}x${height}` });
   }
+
+  const profileCanvasPresets = activeModelSpec ? canvasPresetOptions(activeModelSpec) : [];
+  const profileSizeOptions = profileCanvasPresets.map((item) => ({
+    label: `${item.label} ${item.width}×${item.height}`,
+    value: `${item.width}x${item.height}`,
+  }));
+  if (
+    profileSizeOptions.length > 0 &&
+    !profileSizeOptions.some((item) => item.value === `${width}x${height}`)
+  ) {
+    profileSizeOptions.unshift({
+      label: `当前 ${width}×${height}`,
+      value: `${width}x${height}`,
+    });
+  }
+  const resolvedSizeOptions =
+    profileSizeOptions.length > 0 ? profileSizeOptions : sizeOptions;
+  const activeCanvasPreset = activeModelSpec
+    ? selectedCanvasPreset(width, height, activeModelSpec)
+    : null;
+  const aspectRatio = activeCanvasPreset?.id || 'Free';
+  const aspectOptions = [
+    { label: `自由 / 当前 ${width}×${height}`, value: 'Free' },
+    ...profileCanvasPresets.map((item) => ({
+      label: `${item.label} ${item.width}×${item.height}`,
+      value: item.id,
+    })),
+  ];
+  const handleAspectRatioChange = (value: string) => {
+    if (value === 'Free') return;
+    const preset = profileCanvasPresets.find((item) => item.id === value);
+    if (!preset) return;
+    drawStore.width = preset.width;
+    drawStore.height = preset.height;
+  };
+  const handleModelChange = (value: string) => {
+    drawStore.model = value;
+    const nextSpec = modelsList.find((item) => item.name === value)?.spec;
+    if (!nextSpec) return;
+    const [nextWidth, nextHeight] = normalizeGenerationSize(width, height, nextSpec);
+    drawStore.width = nextWidth;
+    drawStore.height = nextHeight;
+  };
 
   const activeGroup = groups.find((group) => group.id === activeGroupId) || groups[0];
   const activeCharacterId =
@@ -1810,10 +1859,24 @@ export default function DrawPanel({
     api
       .get('/models')
       .then((res) => {
-        const list = res.data.models || [];
+        const list: ModelItem[] = res.data.models || [];
         setModelsList(list);
         if (list.length > 0 && !list.some((item: ModelItem) => item.name === drawStore.model)) {
-          drawStore.model = res.data.default || list[0].name;
+          const fallback =
+            list.find((item: ModelItem) => item.name === res.data.default) ||
+            list.find((item: ModelItem) => item.workflow_supported) ||
+            list[0];
+          drawStore.model = fallback.name;
+        }
+        const active = list.find((item: ModelItem) => item.name === drawStore.model);
+        if (active?.spec) {
+          const [nextWidth, nextHeight] = normalizeGenerationSize(
+            drawStore.width,
+            drawStore.height,
+            active.spec,
+          );
+          drawStore.width = nextWidth;
+          drawStore.height = nextHeight;
         }
       })
       .catch(() => setModelsList([]));
@@ -3168,12 +3231,14 @@ export default function DrawPanel({
           }}
           model={model}
           models={modelsList}
-          onModelChange={(value) => {
-            drawStore.model = value;
-          }}
+          generationProfile={activeModelSpec}
+          onModelChange={handleModelChange}
+          aspectRatio={aspectRatio}
+          aspectOptions={aspectOptions}
+          onAspectRatioChange={handleAspectRatioChange}
           width={width}
           height={height}
-          sizeOptions={sizeOptions}
+          sizeOptions={resolvedSizeOptions}
           onSizeChange={(nextWidth, nextHeight) => {
             drawStore.width = nextWidth;
             drawStore.height = nextHeight;

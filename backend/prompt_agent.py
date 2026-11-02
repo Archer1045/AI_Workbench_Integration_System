@@ -13,6 +13,9 @@ import config
 import content_filter
 import database
 import llm
+import pose_presets_20261102
+import pose_presets_r18_20261102
+import prompt_profiles
 import requests
 
 OLLAMA_BASE = config.OLLAMA_BASE
@@ -3250,6 +3253,62 @@ POSE_PRESETS.extend(
         intensity,
     ) in _SOLO_R18_DEFINITIONS
 )
+
+for _adult_pose in pose_presets_r18_20261102.POSE_PRESET_DEFINITIONS:
+    if _adult_pose["kind"] == "solo":
+        POSE_PRESETS.append(
+            _solo_r18_pose(
+                _adult_pose["id"],
+                _adult_pose["category"],
+                _adult_pose["label"],
+                _adult_pose["translation"],
+                list(_adult_pose["tags"]),
+                list(_adult_pose["contact_points"]),
+                camera=_adult_pose["camera"],
+            )
+        )
+    elif _adult_pose["kind"] == "duo":
+        POSE_PRESETS.append(
+            _duo_r18_pose(
+                _adult_pose["id"],
+                _adult_pose["category"],
+                _adult_pose["label"],
+                _adult_pose["translation"],
+                list(_adult_pose["tags"]),
+                orientation="男女",
+                role_slots=["角色A", "角色B"],
+                contact_points=list(_adult_pose["contact_points"]),
+                action_prompt=_adult_pose["action_prompt"],
+                camera=_adult_pose["camera"],
+            )
+        )
+    else:
+        POSE_PRESETS.append(
+            _pose_preset(
+                _adult_pose["id"],
+                _adult_pose["category"],
+                _adult_pose["label"],
+                _adult_pose["translation"],
+                list(_adult_pose["tags"]),
+                people="多人",
+                orientation="多人",
+                role_slots=["女A", "男A", "男B"],
+                body_separation=True,
+                contact_points=list(_adult_pose["contact_points"]),
+                camera=_adult_pose["camera"],
+                rating="R18",
+                intensity="强化",
+                draw_prompt=(
+                    "exactly 3 separate adult anime characters, one adult woman "
+                    "and two adult men, in one continuous scene; "
+                    + _adult_pose["action_prompt"]
+                    + "; three complete bodies, exactly one head, two arms and "
+                    "two legs per character, clear separate silhouettes, "
+                    "uncensored stylized anatomy, no extra people, no fused bodies"
+                ),
+            )
+        )
+
 SOLO_R18_POSE_IDS = tuple(
     str(item["id"])
     for item in POSE_PRESETS
@@ -3262,6 +3321,40 @@ _GROUP_PROMPT_SUFFIX = (
     "visible expressive faces, separate opaque bodies with clear silhouettes, "
     "no mannequin, no transparent body, no plastic suit, no transparent overlays, "
     "no duplicate limbs, no extra limbs, no fused bodies"
+)
+
+
+for _daily_pose in pose_presets_20261102.POSE_PRESET_DEFINITIONS:
+    _daily_people = (
+        "one person"
+        if _daily_pose["people"] == "单人"
+        else "two people"
+    )
+    POSE_PRESETS.append(
+        _pose_preset(
+            _daily_pose["id"],
+            _daily_pose["category"],
+            _daily_pose["label"],
+            _daily_pose["translation"],
+            list(_daily_pose["tags"]),
+            people=_daily_pose["people"],
+            orientation=_daily_pose["orientation"],
+            role_slots=list(_daily_pose["role_slots"]),
+            body_separation=False,
+            contact_points=list(_daily_pose.get("contact_points") or []),
+            camera=_daily_pose.get("camera", "全身"),
+            sequence=_daily_pose.get("sequence", "进行中"),
+            draw_prompt=(
+                f"{_daily_people} daily-life pose, "
+                + ", ".join(str(tag) for tag in _daily_pose["tags"])
+                + ", natural anatomy, clear silhouette"
+            ),
+        )
+    )
+
+DAILY_POSE_IDS = tuple(
+    str(item["id"])
+    for item in pose_presets_20261102.POSE_PRESET_DEFINITIONS
 )
 
 
@@ -3449,7 +3542,12 @@ def fallback_role_groups(tags: list[str]) -> list[dict]:
     return [group for group in groups if group["items"]]
 
 
-def refine_prompt(description: str, current_prompt: str, requirements: str, pose_tags: list[str]) -> dict:
+def _refine_prompt_legacy(
+    description: str,
+    current_prompt: str,
+    requirements: str,
+    pose_tags: list[str],
+) -> dict:
     """单轮细化：结合图片描述、现有提示词、预设体位与用户要求重新生成并角色感知拆分。"""
     pose_line = "，".join(pose_tags) if pose_tags else "无"
     prompt = (
@@ -3487,6 +3585,30 @@ def refine_prompt(description: str, current_prompt: str, requirements: str, pose
         "prompt": str(data.get("prompt") or current_prompt).strip(),
         "groups": normalize_split_groups(data.get("groups")),
     }
+
+
+def refine_prompt(
+    description: str,
+    current_prompt: str,
+    requirements: str,
+    pose_tags: list[str],
+    prompt_profile: str = "",
+) -> dict:
+    """Refine a prompt under one explicit target-model rule set."""
+    profile = prompt_profiles.resolve_prompt_profile(prompt_profile)
+    enriched_requirements = (
+        f"{profile.instruction}\n"
+        f"用户原始要求：{requirements or '无'}"
+    )
+    result = _refine_prompt_legacy(
+        description,
+        current_prompt,
+        enriched_requirements,
+        pose_tags,
+    )
+    result["profile_id"] = profile.id
+    result["profile_label"] = profile.label
+    return result
 
 
 def split_prompt_role_aware(description: str, tags: list[str]) -> list[dict]:

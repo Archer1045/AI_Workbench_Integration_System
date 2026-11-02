@@ -31,6 +31,7 @@ import pose_prompts
 import prompt_agent
 import prompt_checker
 import prompt_document
+import prompt_profiles
 import scene_presets
 import tag_category
 import task_state
@@ -1767,6 +1768,16 @@ def save_character_appearance(payload: dict = Body(...)) -> dict:
     return saved
 
 
+@router.get("/api/prompt-agent/prompt-profiles")
+def prompt_profiles_api() -> dict:
+    items = prompt_profiles.list_prompt_profiles()
+    return {
+        "items": items,
+        "total": len(items),
+        "default": prompt_profiles.DEFAULT_PROFILE_ID,
+    }
+
+
 @router.post("/api/prompt-agent/refine")
 def refine_prompt(payload: dict = Body(...)):
     """单轮细化：结合图片描述、现有提示词、预设体位与用户要求重新生成并拆分。"""
@@ -1776,6 +1787,9 @@ def refine_prompt(payload: dict = Body(...)):
     if not current_prompt:
         raise HTTPException(status_code=400, detail="prompt 不能为空")
     _ensure_llm_resource_free()
+    prompt_profile = str(
+        payload.get("prompt_profile") or prompt_profiles.DEFAULT_PROFILE_ID
+    ).strip()
     pose_tags: list[str] = []
     preset_id = str(payload.get("pose_preset_id") or "")
     if preset_id:
@@ -1784,7 +1798,13 @@ def refine_prompt(payload: dict = Body(...)):
             people_prompt = str(preset.get("people_prompt") or "").strip()
             pose_tags = [people_prompt, *list(preset.get("tags") or [])] if people_prompt else list(preset.get("tags") or [])
     try:
-        refined = prompt_agent.refine_prompt(description, current_prompt, requirements, pose_tags)
+        refined = prompt_agent.refine_prompt(
+            description,
+            current_prompt,
+            requirements,
+            pose_tags,
+            prompt_profile,
+        )
     except Exception as exc:  # noqa: BLE001
         raise _llm_http_error(exc, "细化并拆分") from exc
     prompt = refined.get("prompt") or current_prompt
@@ -1796,6 +1816,8 @@ def refine_prompt(payload: dict = Body(...)):
         "prompt": prompt,
         "prompt_translation": translate_text(prompt),
         "groups": refined.get("groups") or [],
+        "profile_id": refined.get("profile_id") or prompt_profile,
+        "profile_label": refined.get("profile_label") or "",
     }
 
 

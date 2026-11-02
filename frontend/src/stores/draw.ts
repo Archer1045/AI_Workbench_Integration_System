@@ -596,6 +596,18 @@ async function pollBatch(batchId: string): Promise<void> {
   saveDrawLast({ v: 1, kind: 'batch', batchId });
 }
 
+async function findActiveDrawBatch(): Promise<string> {
+  try {
+    const { data } = await api.get<{
+      busy: boolean;
+      tasks?: Array<{ type: string; job_id?: string }>;
+    }>('/system/busy');
+    return data.tasks?.find((task) => task.type === 'draw' && task.job_id)?.job_id || '';
+  } catch {
+    return '';
+  }
+}
+
 // 提交批量绘画任务并轮询进度
 export async function runDraw(): Promise<void> {
   if (drawStore.generating) return;
@@ -799,7 +811,7 @@ export function restoreDrawRecord(record: {
 
 // 页面刷新后恢复未完成的绘画任务
 export async function resumeDrawTask(): Promise<boolean> {
-  const batchId = loadDrawTask();
+  const batchId = loadDrawTask() || (await findActiveDrawBatch());
   if (!batchId || drawStore.generating) return false;
   drawStore.generating = true;
   drawStore.status = '正在恢复历史任务...';

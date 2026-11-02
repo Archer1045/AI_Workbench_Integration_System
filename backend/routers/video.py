@@ -17,6 +17,8 @@ import content_filter
 import config
 import database
 import llm
+import long_video
+import prompt_profiles
 import task_registry
 import task_resources
 import video_worker
@@ -188,6 +190,10 @@ def create_script(payload: dict = Body(...)) -> dict:
         "prompt（英文 i2v 正向提示词，强调保持关键帧角色形象、细节与场景一致并描述动作节奏）、"
         "negative_prompt（英文负面提示词，包含 worst quality、deformed、static、blurry、extra limbs、text、watermark）。"
         "prompt 必须是完整可用的英文提示词。"
+    )
+    system_prompt += (
+        "\n目标用途规则："
+        + prompt_profiles.resolve_prompt_profile("storyboard").instruction
     )
     raw = ""
     script = {}
@@ -426,3 +432,227 @@ def open_video_library() -> dict:
     VIDEO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     subprocess.Popen(["explorer.exe", str(VIDEO_OUTPUT_DIR)])
     return {"ok": True, "path": str(VIDEO_OUTPUT_DIR)}
+
+
+@router.post("/api/video/long/jobs")
+def start_long_video(payload: dict = Body(...)) -> dict:
+    """Create a checkpointed sequence of Wan I2V segments."""
+    raw_prompts = payload.get("prompts")
+    if not isinstance(raw_prompts, list):
+        raise HTTPException(status_code=400, detail="长视频 prompts 必须是数组")
+    prompts = [str(item or "").strip() for item in raw_prompts]
+    if len(prompts) < 2:
+        raise HTTPException(status_code=400, detail="长视频至少需要两个分段")
+    if len(prompts) > config.LONG_VIDEO_MAX_SEGMENTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"长视频最多 {config.LONG_VIDEO_MAX_SEGMENTS} 个分段",
+        )
+    if any(not prompt for prompt in prompts):
+        raise HTTPException(status_code=400, detail="每个分段都必须有正向提示词")
+    for prompt in prompts:
+        _check_content(prompt)
+    negative_prompt = str(payload.get("negative_prompt") or "").strip()
+    _check_content(negative_prompt)
+
+    keyframe_name = str(payload.get("keyframe_name") or "").strip()
+    if Path(keyframe_name).name != keyframe_name:
+        raise HTTPException(status_code=400, detail="关键帧文件名不合法")
+    if not (VIDEO_KEYFRAME_DIR / keyframe_name).is_file():
+        raise HTTPException(status_code=404, detail="关键帧不存在，请先上传")
+
+    try:
+        frames = int(_payload_value(payload, "frames", config.VIDEO_DEFAULT_FRAMES))
+        fps = int(_payload_value(payload, "fps", config.VIDEO_DEFAULT_FPS))
+        width = int(_payload_value(payload, "width", config.VIDEO_DEFAULT_WIDTH))
+        height = int(_payload_value(payload, "height", config.VIDEO_DEFAULT_HEIGHT))
+        steps = int(_payload_value(payload, "steps", config.VIDEO_DEFAULT_STEPS))
+        cfg = float(_payload_value(payload, "cfg", config.VIDEO_DEFAULT_CFG))
+        denoise = float(_payload_value(payload, "denoise", config.VIDEO_DEFAULT_DENOISE))
+        lora_strength = float(
+            _payload_value(payload, "lora_strength", config.VIDEO_DEFAULT_LORA_STRENGTH)
+        )
+        timeout_seconds = int(
+            _payload_value(payload, "timeout_seconds", config.VIDEO_TIMEOUT_SECONDS)
+        )
+        base_seed = (
+            random.randint(0, 2**63 - 1)
+            if payload.get("seed") in (None, "")
+            else int(payload["seed"])
+        )
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="长视频参数格式不正确") from None
+    total_frames = frames * len(prompts)
+    if total_frames > config.LONG_VIDEO_MAX_TOTAL_FRAMES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"总帧数 {total_frames} 超过上限 "
+                f"{config.LONG_VIDEO_MAX_TOTAL_FRAMES}"
+            ),
+        )
+    if frames not in ALLOWED_FRAMES:
+        raise HTTPException(
+            status_code=400,
+            detail="帧数只支持 " + "/".join(str(value) for value in sorted(ALLOWED_FRAMES)),
+        )
+    if (width, height) not in ALLOWED_SIZES:
+        raise HTTPException(status_code=400, detail="长视频分辨率不在允许列表中")
+    if not config.VIDEO_STEPS_MIN <= steps <= config.VIDEO_STEPS_MAX:
+        raise HTTPException(status_code=400, detail="长视频步数超出范围")
+    if not config.VIDEO_CFG_MIN <= cfg <= config.VIDEO_CFG_MAX:
+        raise HTTPException(status_code=400, detail="长视频 CFG 超出范围")
+    if not config.VIDEO_DENOISE_MIN <= denoise <= config.VIDEO_DENOISE_MAX:
+        raise HTTPException(status_code=400, detail="长视频 denoise 超出范围")
+    if not config.VIDEO_LORA_STRENGTH_MIN <= lora_strength <= config.VIDEO_LORA_STRENGTH_MAX:
+        raise HTTPException(status_code=400, detail="长视频 LoRA 强度超出范围")
+    if base_seed < 0:
+        raise HTTPException(status_code=400, detail="长视频 seed 必须是非负整数")
+    script_id: int | None = None
+    if payload.get("script_id") not in (None, ""):
+        try:
+            script_id = int(payload["script_id"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="script_id 格式不正确") from None
+
+    job_id = uuid.uuid4().hex
+    use_lora = bool(payload.get("use_lora", True))
+    params = {
+        "keyframe_name": keyframe_name,
+        "prompts": prompts,
+        "segment_seeds": [
+            (base_seed + index) % (2**63)
+            for index in range(len(prompts))
+        ],
+        "negative_prompt": negative_prompt,
+        "model": config.VIDEO_MODEL,
+        "clip": config.VIDEO_CLIP,
+        "vae": config.VIDEO_VAE,
+        "clip_vision": config.VIDEO_CLIP_VISION,
+        "lora": config.VIDEO_LORA,
+        "use_lora": use_lora,
+        "frames": frames,
+        "fps": fps,
+        "width": width,
+        "height": height,
+        "steps": steps,
+        "cfg": cfg,
+        "denoise": denoise,
+        "lora_strength": lora_strength,
+        "timeout_seconds": timeout_seconds,
+    }
+    task_registry.register(
+        "video_long",
+        job_id,
+        payload=params,
+        total=len(prompts),
+        resources=task_resources.for_kind("video_long"),
+    )
+    try:
+        long_video.create_state(job_id, params)
+        record_id = database.insert_video_record(
+            job_id,
+            script_id,
+            keyframe_name,
+            " | ".join(prompts),
+            negative_prompt,
+            config.VIDEO_MODEL,
+            [config.VIDEO_LORA] if use_lora else [],
+            base_seed,
+            width,
+            height,
+            total_frames,
+            fps,
+        )
+    except Exception:
+        task_registry.finish("video_long", job_id, "error", "长视频初始化失败")
+        raise
+    threading.Thread(
+        target=long_video.run_job,
+        args=(job_id,),
+        daemon=True,
+    ).start()
+    return {
+        "job_id": job_id,
+        "record_id": record_id,
+        "status": "running",
+        "segments": len(prompts),
+        "total_frames": total_frames,
+    }
+
+
+@router.get("/api/video/long/jobs/{job_id}")
+def long_video_status(job_id: str) -> dict:
+    try:
+        state = long_video.load_state(job_id)
+    except long_video.LongVideoError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "state": state,
+        "task": task_registry.get("video_long", job_id),
+        "record": database.get_video_record_by_job(job_id),
+    }
+
+
+@router.post("/api/video/long/jobs/{job_id}/stop")
+def stop_long_video(job_id: str) -> dict:
+    try:
+        return long_video.request_stop(job_id)
+    except long_video.LongVideoError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/api/video/long/jobs/{job_id}/resume")
+def resume_long_video(job_id: str, payload: dict = Body(default={})) -> dict:
+    try:
+        state = long_video.load_state(job_id)
+        if state.get("status") == "done":
+            raise HTTPException(status_code=400, detail="长视频任务已经完成")
+        task = task_registry.get("video_long", job_id)
+        if task and task.get("status") == "running":
+            raise HTTPException(status_code=409, detail="长视频任务正在运行")
+        raw_from = payload.get("from_segment")
+        from_segment = int(raw_from) if raw_from not in (None, "") else None
+        start = long_video.resume_index(job_id, from_segment)
+    except HTTPException:
+        raise
+    except (long_video.LongVideoError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        if task:
+            resumed = task_registry.update(
+                "video_long",
+                job_id,
+                status="running",
+                error=None,
+                stop_requested=False,
+                current=f"准备从第 {start} 段恢复",
+            )
+        else:
+            resumed = task_registry.register(
+                "video_long",
+                job_id,
+                payload=state["params"],
+                total=len(state["segments"]),
+                resources=task_resources.for_kind("video_long"),
+            )
+        if not resumed:
+            raise HTTPException(status_code=404, detail="长视频任务不存在")
+        long_video.prepare_resume(job_id, start)
+        database.update_video_record_result(job_id, "running")
+    except HTTPException:
+        task_registry.finish("video_long", job_id, "error", "恢复初始化失败")
+        raise
+    except Exception as exc:
+        task_registry.finish("video_long", job_id, "error", "恢复初始化失败")
+        raise HTTPException(status_code=500, detail=f"长视频恢复失败：{exc}") from exc
+    threading.Thread(
+        target=long_video.run_job,
+        args=(job_id,),
+        daemon=True,
+    ).start()
+    return {
+        "job_id": job_id,
+        "status": "running",
+        "from_segment": start,
+    }

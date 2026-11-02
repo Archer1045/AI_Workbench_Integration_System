@@ -128,6 +128,7 @@ export default defineConfig(({ command }) => ({
     ...(command === 'build' ? [copyPublicAssetsWithoutGit()] : []),
   ],
   server: {
+    host: '127.0.0.1',
     port: FRONTEND_PORT,
     strictPort: true,
     proxy: {

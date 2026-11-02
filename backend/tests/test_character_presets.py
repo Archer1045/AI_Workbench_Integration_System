@@ -1,6 +1,7 @@
 """Built-in character identity presets and their default outfits."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import character_presets
@@ -293,7 +294,7 @@ def test_character_default_outfits_are_registered_without_fake_images() -> None:
         item for item in clothing_presets.CLOTHING_PRESETS
         if item["category"] == "角色服装"
     ]
-    assert len(character_outfits) == 290
+    assert len(character_outfits) == 400
     assert (
         by_id["outfit_honkai_impact_3rd_big_luna_default"]["label"]
         == "月下誓约-予爱以心 默认服装"
@@ -450,7 +451,43 @@ def test_character_default_outfits_are_listed_without_images(client) -> None:
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["total"] == 290
+    assert body["total"] == 400
     assert all(item["category"] == "角色服装" for item in body["items"])
     assert all(item["has_image"] is False for item in body["items"])
     assert all(item["image"] is None for item in body["items"])
+
+
+def test_user_character_batch_has_independent_default_outfits() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    characters = json.loads(
+        (
+            repo_root
+            / "character-presets-20261101"
+            / "characters.json"
+        ).read_text(encoding="utf-8")
+    )
+    outfits = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "character_default_outfits_20261101.json"
+        ).read_text(encoding="utf-8")
+    )
+    clothing_by_id = {
+        str(item["id"]): item for item in clothing_presets.CLOTHING_PRESETS
+    }
+
+    assert len(characters) == 110
+    assert len(outfits) == 110
+    assert len({item["preset_id"] for item in characters}) == 110
+    assert len({item["id"] for item in outfits}) == 110
+    for character in characters:
+        outfit_id = character["outfit_id"]
+        outfit = clothing_by_id[outfit_id]
+        assert not character.get("clothing_tags")
+        assert character["appearance_tags"]
+        assert outfit["tags"]
+        assert outfit["source"] == "user"
+        assert outfit["category"] == "角色服装"
+        assert not {
+            tag.casefold() for tag in character["appearance_tags"]
+        } & {tag.casefold() for tag in outfit["tags"]}

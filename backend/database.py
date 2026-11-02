@@ -306,7 +306,7 @@ _TABLES = {
 }
 
 # SQLite 版本化迁移：新库与旧库都从 user_version=0 开始依次执行。
-SCHEMA_VERSION = 33
+SCHEMA_VERSION = 35
 
 
 def get_connection() -> sqlite3.Connection:
@@ -1191,6 +1191,102 @@ def _migration_033_character_outfit_set_links(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_034_managed_reference_galleries(conn: sqlite3.Connection) -> None:
+    """Create a separate repository for managed pose/costume reference assets."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS gallery_sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL UNIQUE,
+            source_directory TEXT NOT NULL,
+            import_mode TEXT NOT NULL DEFAULT 'managed',
+            manifest_relative_path TEXT NOT NULL DEFAULT '',
+            accepted_at TEXT NOT NULL,
+            last_synced_at TEXT,
+            status TEXT NOT NULL DEFAULT 'empty',
+            item_count INTEGER NOT NULL DEFAULT 0,
+            warning TEXT NOT NULL DEFAULT '',
+            error TEXT NOT NULL DEFAULT '',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS gallery_assets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            external_id TEXT NOT NULL,
+            source_relative_path TEXT NOT NULL,
+            managed_relative_path TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            width INTEGER NOT NULL,
+            height INTEGER NOT NULL,
+            format TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT '',
+            system TEXT NOT NULL DEFAULT '',
+            angle TEXT NOT NULL DEFAULT '',
+            group_name TEXT NOT NULL DEFAULT '',
+            tags_json TEXT NOT NULL DEFAULT '[]',
+            search_text TEXT NOT NULL DEFAULT '',
+            thumbnail_relative_path TEXT NOT NULL DEFAULT '',
+            favorite INTEGER NOT NULL DEFAULT 0,
+            last_used_at TEXT,
+            use_count INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'active',
+            imported_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(source_id, external_id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_gallery_sources_kind_enabled
+        ON gallery_sources(kind, enabled)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_gallery_assets_kind_status
+        ON gallery_assets(kind, status, name)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_gallery_assets_source
+        ON gallery_assets(source_id, status)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_gallery_assets_sha
+        ON gallery_assets(sha256)
+        """
+    )
+
+
+def _migration_035_gallery_pose_links(conn: sqlite3.Connection) -> None:
+    """Link managed pose images to the canonical pose-prompt presets."""
+    columns = _table_columns(conn, "gallery_assets")
+    if "pose_preset_id" not in columns:
+        conn.execute(
+            "ALTER TABLE gallery_assets "
+            "ADD COLUMN pose_preset_id TEXT NOT NULL DEFAULT ''"
+        )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_gallery_assets_pose_preset
+        ON gallery_assets(kind, pose_preset_id, status)
+        """
+    )
+
+
 _MIGRATIONS = (
     _migration_001_compat,
     _migration_002_background_jobs,
@@ -1225,6 +1321,8 @@ _MIGRATIONS = (
     _migration_031_character_visual_corrections,
     _migration_032_outfit_sets,
     _migration_033_character_outfit_set_links,
+    _migration_034_managed_reference_galleries,
+    _migration_035_gallery_pose_links,
 )
 
 
@@ -2444,6 +2542,7 @@ def update_video_record_result(
     duration_seconds: float | None = None,
 ) -> dict | None:
     """更新成片记录终态；由任务 job_id 定位。"""
+    finished_at = None if status == "running" else now_iso()
     with get_connection() as conn:
         conn.execute(
             """
@@ -2451,7 +2550,7 @@ def update_video_record_result(
             SET status = ?, error = ?, video_name = ?, duration_seconds = ?, finished_at = ?
             WHERE job_id = ?
             """,
-            (status, error, video_name, duration_seconds, now_iso(), job_id),
+            (status, error, video_name, duration_seconds, finished_at, job_id),
         )
     return get_video_record_by_job(job_id)
 

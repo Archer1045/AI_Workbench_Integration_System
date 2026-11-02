@@ -2,10 +2,12 @@
 import { Modal } from 'antd';
 import useStore from 'resso';
 import { api } from '../api';
+import { notifyFinishedTasks } from './taskNotifications';
 
 export interface BusyTask {
   type: string;
   label: string;
+  job_id?: string;
 }
 
 interface BusyState {
@@ -22,8 +24,10 @@ export const busyStore = useStore<BusyState>({
 export async function refreshBusy(): Promise<void> {
   try {
     const { data } = await api.get<{ busy: boolean; tasks: BusyTask[] }>('/system/busy');
+    const nextTasks = data.tasks || [];
+    notifyFinishedTasks(busyStore.tasks, nextTasks);
     busyStore.busy = Boolean(data.busy);
-    busyStore.tasks = data.tasks || [];
+    busyStore.tasks = nextTasks;
   } catch {
     busyStore.busy = false;
     busyStore.tasks = [];

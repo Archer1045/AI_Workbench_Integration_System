@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 import ActionComposerPanel from './ActionComposerPanel';
+import ComicTextPanel from './ComicTextPanel';
 import DrawPanel from './DrawPanel';
 import ImageDeobfuscationPanel from './ImageDeobfuscationPanel';
 import InpaintPanel from './InpaintPanel';
 
-type DrawingMode = 'draw' | 'inpaint' | 'composer' | 'deobfuscation';
+type DrawingMode = 'draw' | 'inpaint' | 'composer' | 'deobfuscation' | 'comic';
 
 const MODE_KEY = 'rider-studio:ai-drawing-mode-v1';
 
 function loadMode(): DrawingMode {
   try {
     const value = localStorage.getItem(MODE_KEY);
-    return value === 'composer' || value === 'inpaint' || value === 'deobfuscation'
+    return value === 'composer' ||
+      value === 'inpaint' ||
+      value === 'deobfuscation' ||
+      value === 'comic'
       ? value
       : 'draw';
   } catch {
@@ -77,6 +81,15 @@ export default function AIDrawingWorkspace() {
         >
           图片解混淆
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'comic'}
+          className={mode === 'comic' ? 'active' : ''}
+          onClick={() => setMode('comic')}
+        >
+          漫画文字
+        </button>
       </div>
       <div className="ai-drawing-mode-panel" hidden={mode !== 'draw'}>
         <DrawPanel
@@ -99,6 +112,9 @@ export default function AIDrawingWorkspace() {
       </div>
       <div className="ai-drawing-mode-panel" hidden={mode !== 'deobfuscation'}>
         <ImageDeobfuscationPanel active={mode === 'deobfuscation'} />
+      </div>
+      <div className="ai-drawing-mode-panel" hidden={mode !== 'comic'}>
+        <ComicTextPanel active={mode === 'comic'} />
       </div>
     </div>
   );

@@ -27,6 +27,7 @@ TASK_RESOURCE_POLICIES = {
     "review": (("gpu", "exclusive"), ("ollama", "shared"), ("vlm", "exclusive")),
     "merge": (),
     "video": (("gpu", "exclusive"), ("comfyui", "exclusive")),
+    "video_long": (("gpu", "exclusive"), ("comfyui", "exclusive")),
     "preset_asset": (("gpu", "exclusive"), ("comfyui", "exclusive")),
     "game_assistant_run": (("emulator", "exclusive"), ("adb", "exclusive")),
     "game_assistant_crawl": (),

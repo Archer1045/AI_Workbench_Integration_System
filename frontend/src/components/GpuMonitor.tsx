@@ -4,6 +4,7 @@ import { DesktopOutlined } from '@ant-design/icons';
 import { Button, Popover, Tag, Tooltip } from 'antd';
 import { useEffect, useState } from 'react';
 import { api, type GpuInfo } from '../api';
+import { busyStore } from '../stores/busy';
 
 const MAX_POINTS = 60;
 
@@ -22,6 +23,8 @@ export default function GpuMonitor() {
   const [memHistory, setMemHistory] = useState<GpuPoint[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState(false);
+  const [peakVramMb, setPeakVramMb] = useState(0);
+  const { tasks } = busyStore;
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +37,7 @@ export default function GpuMonitor() {
         const time = new Date().toLocaleTimeString();
         setUtilHistory((prev) => [...prev.slice(-(MAX_POINTS - 1)), { time, value: data.util }]);
         setMemHistory((prev) => [...prev.slice(-(MAX_POINTS - 1)), { time, value: data.memory_used_mb }]);
+        setPeakVramMb((previous) => Math.max(previous, data.memory_used_mb));
         setError(false);
       } catch {
         if (!cancelled) setError(true);
@@ -53,6 +57,30 @@ export default function GpuMonitor() {
   const content = (
     <div className="gpu-monitor-popover">
       <div className="gpu-monitor-cards">
+        <div className="gpu-card">
+          <span>显存峰值</span>
+          <b>{peakVramMb > 0 ? formatGb(peakVramMb) : '--'}</b>
+        </div>
+        <div className="gpu-card">
+          <span>CPU</span>
+          <b>{info ? `${info.cpu_percent}%` : '--'}</b>
+        </div>
+        <div className="gpu-card">
+          <span>内存</span>
+          <b>
+            {info && info.ram_total_mb > 0
+              ? `${formatGb(info.ram_used_mb)} / ${formatGb(info.ram_total_mb)}`
+              : '--'}
+          </b>
+        </div>
+        <div className="gpu-card">
+          <span>磁盘剩余</span>
+          <b>
+            {info && info.disk_total_gb > 0
+              ? `${info.disk_free_gb} / ${info.disk_total_gb}GB`
+              : '--'}
+          </b>
+        </div>
         <div className={`gpu-card${memWarning ? ' warning' : ''}`}>
           <span>显存</span>
           <b>
@@ -71,6 +99,18 @@ export default function GpuMonitor() {
           <span>功耗</span>
           <b>{info ? `${info.power_w}W` : '--'}</b>
         </div>
+      </div>
+      <div className="gpu-monitor-models">
+        <span>运行任务</span>
+        {tasks.length > 0 ? (
+          tasks.map((task) => (
+            <Tag key={`${task.type}:${task.job_id || task.label}`} color="gold">
+              {task.label}
+            </Tag>
+          ))
+        ) : (
+          <Tag>空闲</Tag>
+        )}
       </div>
       <div className="gpu-monitor-models">
         <span>当前模型</span>

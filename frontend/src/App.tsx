@@ -3,6 +3,7 @@ import { Button, Layout, Space, Switch, Tabs, Tag, Tooltip } from "antd";
 import { lazy, Suspense, useEffect } from "react";
 import AutoShutdownBanner from "./components/AutoShutdownBanner";
 import GpuMonitor from "./components/GpuMonitor";
+import TaskNotificationControl from "./components/TaskNotificationControl";
 import {
   refreshServices,
   servicesStore,
@@ -73,6 +74,7 @@ export default function App() {
         <div className="brand">AI工作台</div>
         <Space wrap>
           <GpuMonitor />
+          <TaskNotificationControl />
           <Tooltip title="全局内容限制：影响 AI 绘画、提示词 Agent 与情感陪伴；开启后拦截 NSFW 关键词，未成年相关内容始终拦截。">
             <Space>
               <Switch

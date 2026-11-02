@@ -14,6 +14,7 @@ from pathlib import Path
 import requests
 
 import config
+import generation_specs
 
 LORAS_DIR = config.LORAS_DIR
 MODELS_DIR = config.MODELS_DIR
@@ -128,6 +129,7 @@ def build_workflow(
     mask_image: str | None = None,
     inpaint_denoise: float = 0.72,
 ) -> tuple[dict, int]:
+    generation_specs.require_workflow_supported(model_name)
     graph: dict = {}
     graph["1"] = {"class_type": "UNETLoader", "inputs": {"unet_name": model_name, "weight_dtype": "default"}}
     graph["2"] = {"class_type": "CLIPLoader", "inputs": {"clip_name": CLIP_NAME, "type": "stable_diffusion", "device": "default"}}
@@ -331,6 +333,7 @@ def build_inpaint_workflow(
     lora_strengths: dict | None = None,
 ) -> tuple[dict, int]:
     """Build a reference-image inpaint graph; source pixels stay outside the mask."""
+    generation_specs.require_workflow_supported(model_name)
     graph: dict = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": model_name, "weight_dtype": "default"}},
         "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": CLIP_NAME, "type": "stable_diffusion", "device": "default"}},

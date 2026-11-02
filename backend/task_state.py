@@ -9,6 +9,7 @@ TASK_LABELS = {
     "review": "数据集 AI 审查",
     "merge": "LoRA 合并",
     "video": "AI 视频",
+    "video_long": "长视频分段",
     "preset_asset": "预设缩略图",
     "game_assistant_run": "游戏助手任务",
     "game_assistant_crawl": "游戏资料抓取",

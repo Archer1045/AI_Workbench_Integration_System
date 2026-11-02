@@ -9,7 +9,7 @@ import {
   Tooltip,
 } from 'antd';
 import type { MenuProps } from 'antd';
-import type { LoraItem, ModelItem } from '../api';
+import type { GenerationProfile, LoraItem, ModelItem } from '../api';
 import DrawLoraSelector from './DrawLoraSelector';
 import TagCompareTable from './TagCompareTable';
 
@@ -19,7 +19,11 @@ interface DrawGenerationSettingsPanelProps {
   onNegativePromptChange: (value: string) => void;
   model: string;
   models: ModelItem[];
+  generationProfile: GenerationProfile | null;
   onModelChange: (value: string) => void;
+  aspectRatio: string;
+  aspectOptions: { label: string; value: string }[];
+  onAspectRatioChange: (value: string) => void;
   width: number;
   height: number;
   sizeOptions: { label: string; value: string }[];
@@ -66,7 +70,11 @@ export default function DrawGenerationSettingsPanel({
   onNegativePromptChange,
   model,
   models,
+  generationProfile,
   onModelChange,
+  aspectRatio,
+  aspectOptions,
+  onAspectRatioChange,
   width,
   height,
   sizeOptions,
@@ -106,10 +114,38 @@ export default function DrawGenerationSettingsPanel({
               style={{ width: '100%' }}
               value={model}
               options={models.map((item) => ({
-                label: `${item.name} (${item.size_mb}MB)`,
+                label: item.workflow_supported
+                  ? `${item.name} (${item.size_mb}MB)`
+                  : `${item.name} (${item.size_mb}MB · 未适配)`,
                 value: item.name,
+                disabled: !item.workflow_supported,
               }))}
               onChange={onModelChange}
+            />
+          </div>
+          {generationProfile ? (
+            <div
+              className="setting-wide draw-model-spec-line"
+              data-tone={generationProfile.workflow_supported ? 'ok' : 'warning'}
+            >
+              <span>
+                {generationProfile.label} · {generationProfile.latent_node} · 步长{' '}
+                {generationProfile.resolution_step}px · {generationProfile.channels} 通道
+              </span>
+              {!generationProfile.workflow_supported ? (
+                <div className="help">{generationProfile.workflow_support_reason}</div>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="setting-field setting-wide">
+            <Tooltip title="按目标模型生成合法画布，固定比例后自动对齐尺寸步长">
+              <span className="setting-label">比例</span>
+            </Tooltip>
+            <Select
+              style={{ width: '100%' }}
+              value={aspectRatio}
+              options={aspectOptions}
+              onChange={onAspectRatioChange}
             />
           </div>
           <div className="setting-field setting-wide">

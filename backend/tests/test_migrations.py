@@ -344,9 +344,23 @@ def test_migration_033_upgrades_existing_v32_table_before_indexes(
             """
         ).fetchone()
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-    assert version == 33
+    assert version == database.SCHEMA_VERSION
     assert {"outfit_set_id", "outfit_set_version"} <= columns
     assert index is not None
+    with database.get_connection() as conn:
+        gallery_tables = {
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+    assert {"gallery_sources", "gallery_assets"} <= gallery_tables
+    with database.get_connection() as conn:
+        gallery_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(gallery_assets)").fetchall()
+        }
+    assert "pose_preset_id" in gallery_columns
 
 
 def test_character_visual_correction_migration_upgrades_stale_rows(

@@ -1,6 +1,9 @@
 """内置服装预设库：英文标签 + 中文说明 + 可选的构图提示。"""
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import character_presets
 import lace_sheer_private_presets
 
@@ -929,6 +932,43 @@ for _character in character_presets.BUILTIN_CHARACTER_PRESETS:
             has_image=False,
         )
     )
+
+
+def _load_user_character_default_outfits() -> None:
+    """Load independently stored default outfits for imported characters."""
+    path = Path(__file__).with_name("character_default_outfits_20261101.json")
+    if not path.is_file():
+        return
+    records = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(records, list):
+        raise ValueError("character_default_outfits_20261101.json must be a list")
+    existing_ids = {str(item["id"]) for item in CLOTHING_PRESETS}
+    for record in records:
+        preset_id = str(record.get("id") or "").strip()
+        tags = list(record.get("tags") or [])
+        if not preset_id or not tags:
+            raise ValueError("character default outfit requires an id and tags")
+        if preset_id in existing_ids:
+            raise ValueError(f"duplicate clothing preset id: {preset_id}")
+        item = _p(
+            preset_id,
+            "角色服装",
+            str(record.get("label") or preset_id),
+            str(record.get("translation") or ""),
+            tags,
+            gender="女",
+            aliases=[str(record.get("label") or preset_id)],
+            has_image=False,
+        )
+        item["source"] = str(record.get("source") or "user")
+        item["character_preset_id"] = str(
+            record.get("character_preset_id") or ""
+        )
+        CLOTHING_PRESETS.append(item)
+        existing_ids.add(preset_id)
+
+
+_load_user_character_default_outfits()
 
 # Keep the original 100 records compatible with the v2 schema without
 # duplicating their source entries.

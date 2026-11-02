@@ -48,6 +48,47 @@ WEB_TOOLS_CONFIG_DIR = Path(_env("WEB_TOOLS_CONFIG_DIR", str(AI_PRODUCT_DIR / "a
 WEB_TOOLS_CACHE_DIR = Path(_env("WEB_TOOLS_CACHE_DIR", str(WEB_TOOLS_CONFIG_DIR / "web_tools_cache")))
 WEB_TOOLS_EVENTS_PATH = Path(_env("WEB_TOOLS_EVENTS", str(WEB_TOOLS_CONFIG_DIR / "web_tools_events.jsonl")))
 WEB_TOOLS_SECRETS_PATH = Path(_env("WEB_TOOLS_SECRETS", str(WEB_TOOLS_CONFIG_DIR / "secrets.json")))
+EXTERNAL_GALLERY_CONFIG_PATH = Path(
+    _env(
+        "EXTERNAL_GALLERY_CONFIG_PATH",
+        str(WEB_TOOLS_CONFIG_DIR / "external_galleries.json"),
+    )
+)
+EXTERNAL_GALLERY_CACHE_DIR = Path(
+    _env(
+        "EXTERNAL_GALLERY_CACHE_DIR",
+        str(WEB_TOOLS_CONFIG_DIR / "external_gallery_cache"),
+    )
+)
+EXTERNAL_GALLERY_ASSET_ROOT = Path(
+    _env(
+        "EXTERNAL_GALLERY_ASSET_ROOT",
+        str(AI_PRODUCT_DIR / "gallery_assets"),
+    )
+)
+EXTERNAL_GALLERY_MAX_ITEMS = _env_int("EXTERNAL_GALLERY_MAX_ITEMS", 20_000)
+COMIC_FONT_DIR = Path(
+    _env(
+        "COMIC_FONT_DIR",
+        str(AI_PRODUCT_DIR / "app_config" / "comic_fonts"),
+    )
+)
+COMIC_TEXT_MAX_BYTES = _env_int("COMIC_TEXT_MAX_BYTES", 25_000_000)
+COMIC_TEXT_MAX_PIXELS = _env_int("COMIC_TEXT_MAX_PIXELS", 12_000_000)
+COMIC_TEXT_MAX_BOXES = _env_int("COMIC_TEXT_MAX_BOXES", 50)
+STORYBOARD_MAX_BYTES = _env_int("STORYBOARD_MAX_BYTES", 25_000_000)
+STORYBOARD_MAX_PIXELS = _env_int("STORYBOARD_MAX_PIXELS", 80_000_000)
+STORYBOARD_CROP_MARGIN_MAX = _env_int("STORYBOARD_CROP_MARGIN_MAX", 200)
+VIDEO_MERGE_MAX_FILES = _env_int("VIDEO_MERGE_MAX_FILES", 10)
+VIDEO_MERGE_MAX_BYTES = _env_int("VIDEO_MERGE_MAX_BYTES", 2_000_000_000)
+VIDEO_MERGE_OUTPUT_DIR = Path(
+    _env("VIDEO_MERGE_OUTPUT_DIR", str(AI_PRODUCT_DIR / "video_merges"))
+)
+LONG_VIDEO_ROOT = Path(
+    _env("LONG_VIDEO_ROOT", str(AI_PRODUCT_DIR / "video_long_jobs"))
+)
+LONG_VIDEO_MAX_SEGMENTS = _env_int("LONG_VIDEO_MAX_SEGMENTS", 20)
+LONG_VIDEO_MAX_TOTAL_FRAMES = _env_int("LONG_VIDEO_MAX_TOTAL_FRAMES", 600)
 GAME_ASSISTANT_SOURCE_MAX_BYTES = _env_int("GAME_ASSISTANT_SOURCE_MAX_BYTES", 5_000_000)
 GAME_ASSISTANT_SOURCE_IMAGE_MAX_BYTES = _env_int(
     "GAME_ASSISTANT_SOURCE_IMAGE_MAX_BYTES", 25_000_000
@@ -498,6 +539,8 @@ def runtime_config() -> dict:
             "default_lora_strength": VIDEO_DEFAULT_LORA_STRENGTH,
             "seed_min": VIDEO_SEED_MIN,
             "timeout_seconds": VIDEO_TIMEOUT_SECONDS,
+            "long_video_max_segments": LONG_VIDEO_MAX_SEGMENTS,
+            "long_video_max_total_frames": LONG_VIDEO_MAX_TOTAL_FRAMES,
             "keyframe_max_bytes": VIDEO_KEYFRAME_MAX_BYTES,
             "script_max_length": VIDEO_SCRIPT_MAX_LENGTH,
             "steps_min": VIDEO_STEPS_MIN,
@@ -607,6 +650,12 @@ def runtime_config() -> dict:
             "max_concurrency": IMAGE_DEOBFUSCATION_MAX_CONCURRENCY,
             "roughness_ratio_max": IMAGE_DEOBFUSCATION_ROUGHNESS_RATIO_MAX,
             "min_roughness_drop": IMAGE_DEOBFUSCATION_MIN_ROUGHNESS_DROP,
+            "comic_max_bytes": COMIC_TEXT_MAX_BYTES,
+            "comic_max_pixels": COMIC_TEXT_MAX_PIXELS,
+            "comic_max_boxes": COMIC_TEXT_MAX_BOXES,
+            "storyboard_max_bytes": STORYBOARD_MAX_BYTES,
+            "storyboard_max_pixels": STORYBOARD_MAX_PIXELS,
+            "storyboard_crop_margin_max": STORYBOARD_CROP_MARGIN_MAX,
         },
         "settings": {
             "health_interval_default": SETTINGS_HEALTH_INTERVAL_DEFAULT,

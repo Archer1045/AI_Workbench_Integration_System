@@ -14,7 +14,7 @@ from clothing_presets import (
 
 
 def test_clothing_preset_data_is_complete() -> None:
-    assert len(CLOTHING_PRESETS) == 1013
+    assert len(CLOTHING_PRESETS) == 1123
     ids = [item["id"] for item in CLOTHING_PRESETS]
     assert len(ids) == len(set(ids))
     body_jewelry_ids = {item["id"] for item in clothing_presets.BODY_JEWELRY_PRESETS}
@@ -146,7 +146,7 @@ def test_clothing_preset_data_is_complete() -> None:
         assert item["nsfw"] is True
         assert item["has_image"] is False
     assert sum(item["has_image"] for item in CLOTHING_PRESETS) == 336
-    assert sum(item["category"] == "角色服装" for item in CLOTHING_PRESETS) == 290
+    assert sum(item["category"] == "角色服装" for item in CLOTHING_PRESETS) == 400
     for item in CLOTHING_PRESETS:
         assert item["schema_version"] == 2
         assert item["category"] in CATEGORIES
@@ -178,7 +178,7 @@ def test_clothing_presets_api_returns_all_when_unrestricted(client) -> None:
     response = client.get("/api/prompt-agent/clothing-presets")
     assert response.status_code == 200
     body = response.json()
-    assert body["total"] == 1013
+    assert body["total"] == 1123
     assert body["restricted"] is False
     assert any(item["nsfw"] for item in body["items"])
     assert {"rating", "tag_count", "materials", "layer_state", "color_slots"} <= set(body["items"][0])

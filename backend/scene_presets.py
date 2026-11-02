@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+import scene_presets_20261102
+
 CATEGORIES = (
     "拘束与固定",
     "权力交换",
@@ -2988,3 +2990,32 @@ SCENE_PRESETS = [
         draw_prompt="a Christmas market with wooden stalls, warm string lights, winter decorations and a cobblestone street, no people",
     ),
 ]
+
+for _scene_definition in scene_presets_20261102.SCENE_PRESET_DEFINITIONS:
+    SCENE_PRESETS.append(
+        _daily_scene(
+            _scene_definition["id"],
+            _scene_definition["category"],
+            _scene_definition["label"],
+            _scene_definition["translation"],
+            list(_scene_definition["tags"]),
+            rating=_scene_definition["rating"],
+            intensity=_scene_definition["intensity"],
+            setting=_scene_definition["setting"],
+            equipment=list(_scene_definition["equipment"]),
+            camera=_scene_definition["camera"],
+            lighting=_scene_definition["lighting"],
+            draw_prompt=_scene_definition["draw_prompt"],
+        )
+    )
+
+DAILY_SCENE_IDS = tuple(
+    str(item["id"])
+    for item in scene_presets_20261102.SCENE_PRESET_DEFINITIONS
+    if item["rating"] == "普通"
+)
+PRIVATE_SCENE_IDS = tuple(
+    str(item["id"])
+    for item in scene_presets_20261102.SCENE_PRESET_DEFINITIONS
+    if item["rating"] == "R18"
+)

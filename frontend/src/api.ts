@@ -63,6 +63,8 @@ export interface RuntimeConfig {
     default_lora_strength: number;
     seed_min: number;
     timeout_seconds: number;
+    long_video_max_segments: number;
+    long_video_max_total_frames: number;
     keyframe_max_bytes: number;
     script_max_length: number;
     steps_min: number;
@@ -164,6 +166,12 @@ export interface RuntimeConfig {
     max_concurrency: number;
     roughness_ratio_max: number;
     min_roughness_drop: number;
+    comic_max_bytes: number;
+    comic_max_pixels: number;
+    comic_max_boxes: number;
+    storyboard_max_bytes: number;
+    storyboard_max_pixels: number;
+    storyboard_crop_margin_max: number;
   };
   settings: {
     health_interval_default: number;
@@ -446,6 +454,146 @@ export interface ImageToolResult {
   report: ImageToolReport;
 }
 
+export interface ComicDialogue {
+  index: number;
+  text: string;
+  length: number;
+  bubble_size: string;
+}
+
+export interface ComicScriptResult {
+  cleaned_prompt: string;
+  dialogues: ComicDialogue[];
+  dialogue_count: number;
+  warning: string;
+}
+
+export interface ComicFontOption {
+  id: string;
+  label: string;
+  source: string;
+}
+
+export interface ComicCapabilities {
+  fonts: ComicFontOption[];
+  default_font: string;
+  opencv: boolean;
+  auto_bubble_requires: string;
+}
+
+export interface ComicTextBox {
+  text: string;
+  x: number;
+  y: number;
+  max_width: number;
+  max_height: number;
+  font_size: number;
+  alignment: 'left' | 'center' | 'right';
+  text_color: string;
+  outline_width: number;
+  outline_color: string;
+}
+
+export interface ComicTextRenderReport {
+  width: number;
+  height: number;
+  font_id: string;
+  box_count: number;
+  boxes: Array<ComicTextBox & {
+    index: number;
+    font_size: number;
+    lines: string[];
+    line_count: number;
+    fits: boolean;
+  }>;
+}
+
+export interface ComicTextRenderResult {
+  blob: Blob;
+  report: ComicTextRenderReport;
+}
+
+export interface ComicBubble {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  area: number;
+  center_x: number;
+  center_y: number;
+}
+
+export interface ComicBubbleDetection {
+  width: number;
+  height: number;
+  count: number;
+  bubbles: ComicBubble[];
+}
+
+export interface StoryboardCell {
+  order: number;
+  row: number;
+  column: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  file: string;
+}
+
+export interface StoryboardSliceReport {
+  version: number;
+  source_name: string;
+  source_sha256: string;
+  source_width: number;
+  source_height: number;
+  grid: 4 | 6 | 9;
+  rows: number;
+  columns: number;
+  crop_margin: number;
+  cell_count: number;
+  cells: StoryboardCell[];
+}
+
+export interface StoryboardSliceResult {
+  blob: Blob;
+  report: StoryboardSliceReport;
+}
+
+export interface VideoMergeFileInfo {
+  name: string;
+  duration: number;
+  bytes: number;
+  video: {
+    codec: string;
+    width: number;
+    height: number;
+    fps: number;
+  };
+  audio: {
+    codec: string;
+    sample_rate: number;
+    layout: string;
+  } | null;
+}
+
+export interface VideoMergePreflight {
+  compatible: boolean;
+  issues: string[];
+  output_format: string;
+  files: VideoMergeFileInfo[];
+  total_duration: number;
+}
+
+export interface MergedVideoResult {
+  filename: string;
+  url: string;
+  format: string;
+  bytes: number;
+  total_duration: number;
+  files: VideoMergeFileInfo[];
+}
+
 function decodeHeaderJson<T>(value: string | undefined): T {
   if (!value) throw new Error('服务未返回图片处理报告');
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -470,6 +618,172 @@ export async function deobfuscateImage(
     blob: response.data,
     report: decodeHeaderJson<ImageToolReport>(response.headers['x-image-tool-report']),
   };
+}
+
+export async function getComicCapabilities(): Promise<ComicCapabilities> {
+  const response = await api.get<ComicCapabilities>('/image-tools/comic/capabilities');
+  return response.data;
+}
+
+export async function parseComicScript(payload: {
+  raw_prompt: string;
+  base_bubble_description: string;
+}): Promise<ComicScriptResult> {
+  const response = await api.post<ComicScriptResult>('/image-tools/comic/parse', payload);
+  return response.data;
+}
+
+export async function renderComicText(
+  file: File,
+  boxes: ComicTextBox[],
+  fontId: string,
+): Promise<ComicTextRenderResult> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  const response = await api.post<Blob>('/image-tools/comic/render', form, {
+    params: {
+      boxes_json: JSON.stringify(boxes),
+      font_id: fontId,
+    },
+    responseType: 'blob',
+    timeout: 120000,
+  });
+  return {
+    blob: response.data,
+    report: decodeHeaderJson<ComicTextRenderReport>(
+      response.headers['x-image-tool-report'],
+    ),
+  };
+}
+
+export async function detectComicBubbles(
+  file: File,
+  options: { whiteThreshold?: number; minArea?: number; invert?: boolean } = {},
+): Promise<ComicBubbleDetection> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  const response = await api.post<ComicBubbleDetection>(
+    '/image-tools/comic/detect-bubbles',
+    form,
+    {
+      params: {
+        white_threshold: options.whiteThreshold ?? 220,
+        min_area: options.minArea ?? 5000,
+        invert: Boolean(options.invert),
+      },
+      timeout: 120000,
+    },
+  );
+  return response.data;
+}
+
+export async function sliceStoryboard(
+  file: File,
+  grid: 4 | 6 | 9,
+  cropMargin: number,
+): Promise<StoryboardSliceResult> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  const response = await api.post<Blob>('/storyboard/slice', form, {
+    params: {
+      grid,
+      crop_margin: cropMargin,
+    },
+    responseType: 'blob',
+    timeout: 120000,
+  });
+  return {
+    blob: response.data,
+    report: decodeHeaderJson<StoryboardSliceReport>(
+      response.headers['x-image-tool-report'],
+    ),
+  };
+}
+
+function videoMergeForm(files: File[]): FormData {
+  const form = new FormData();
+  files.forEach((file) => form.append('files', file, file.name));
+  return form;
+}
+
+export async function preflightVideoMerge(
+  files: File[],
+): Promise<VideoMergePreflight> {
+  const response = await api.post<VideoMergePreflight>(
+    '/storyboard/merge/preflight',
+    videoMergeForm(files),
+    { timeout: 180000 },
+  );
+  return response.data;
+}
+
+export async function mergeVideoSegments(
+  files: File[],
+): Promise<MergedVideoResult> {
+  const response = await api.post<MergedVideoResult>(
+    '/storyboard/merge',
+    videoMergeForm(files),
+    { timeout: 3_600_000 },
+  );
+  return response.data;
+}
+
+export interface LongVideoStartPayload {
+  keyframe_name: string;
+  prompts: string[];
+  negative_prompt: string;
+  frames: number;
+  fps: number;
+  width: number;
+  height: number;
+  steps: number;
+  cfg: number;
+  denoise: number;
+  lora_strength: number;
+  seed?: number;
+  use_lora?: boolean;
+}
+
+export async function startLongVideo(
+  payload: LongVideoStartPayload,
+): Promise<{
+  job_id: string;
+  record_id: number;
+  status: string;
+  segments: number;
+  total_frames: number;
+}> {
+  const response = await api.post('/video/long/jobs', payload, {
+    timeout: 120000,
+  });
+  return response.data;
+}
+
+export async function getLongVideoStatus(
+  jobId: string,
+): Promise<LongVideoStatus> {
+  const response = await api.get<LongVideoStatus>(
+    `/video/long/jobs/${jobId}`,
+  );
+  return response.data;
+}
+
+export async function stopLongVideo(jobId: string): Promise<void> {
+  await api.post(`/video/long/jobs/${jobId}/stop`);
+}
+
+export async function resumeLongVideo(
+  jobId: string,
+  fromSegment?: number,
+): Promise<{ job_id: string; status: string; from_segment: number }> {
+  const response = await api.post<{
+    job_id: string;
+    status: string;
+    from_segment: number;
+  }>(`/video/long/jobs/${jobId}/resume`, {
+    from_segment: fromSegment,
+  });
+  return response.data;
 }
 
 export interface PresetAssetCatalogFacets {
@@ -827,6 +1141,12 @@ export interface GpuInfo {
   memory_total_mb: number;
   temperature_c: number;
   power_w: number;
+  cpu_percent: number;
+  ram_used_mb: number;
+  ram_total_mb: number;
+  disk_free_gb: number;
+  disk_total_gb: number;
+  process_memory_mb: number;
   active_models: GpuActiveModel[];
 }
 
@@ -1107,9 +1427,38 @@ export interface LoraItem {
   incompatible_reason?: string | null;
 }
 
+export interface GenerationCanvasPreset {
+  id: string;
+  label: string;
+  width: number;
+  height: number;
+}
+
+export interface GenerationProfile {
+  id: string;
+  label: string;
+  latent_node: string;
+  channels: number;
+  height_divisor: number;
+  width_divisor: number;
+  resolution_step: number;
+  min_size: number;
+  max_size: number;
+  batch_max: number;
+  downscale_ratio: number;
+  workflow_supported: boolean;
+  workflow_support_reason: string;
+  canvas_presets: GenerationCanvasPreset[];
+}
+
 export interface ModelItem {
   name: string;
   size_mb: number;
+  generation_profile: string;
+  generation_profile_label: string;
+  workflow_supported: boolean;
+  workflow_support_reason: string;
+  spec: GenerationProfile;
 }
 
 export interface PresetTaxonomyFields {
@@ -1721,6 +2070,69 @@ export interface ImageLibrary {
   items: DrawImageRecord[];
 }
 
+export type ExternalGalleryKind = 'pose' | 'costume';
+
+export interface ExternalGalleryBinding {
+  label: string;
+  directory: string;
+  accepted: boolean;
+  accepted_at: string;
+  configured: boolean;
+  available: boolean;
+  source_available: boolean;
+  binding_id: string;
+  source_id?: number | null;
+  import_mode: 'managed' | 'reference';
+  status: string;
+  item_count: number;
+  last_synced_at?: string | null;
+  warning: string;
+  error: string;
+}
+
+export interface ExternalGallerySettings {
+  pose: ExternalGalleryBinding;
+  costume: ExternalGalleryBinding;
+}
+
+export interface ExternalGalleryItem {
+  id: string;
+  asset_id?: number;
+  name: string;
+  category: string;
+  system: string;
+  angle: string;
+  group: string;
+  tags: string[];
+  path: string;
+  thumb: string;
+  search: string;
+  image_url: string;
+  thumbnail_url: string;
+  favorite?: boolean;
+  last_used_at?: string | null;
+  use_count?: number;
+  managed?: boolean;
+  pose_preset_id?: string;
+  pose_preset_label?: string;
+  pose_preset_category?: string;
+}
+
+export interface ExternalGalleryCatalogue {
+  kind: ExternalGalleryKind;
+  mode: 'manifest' | 'folder' | 'database';
+  manifest: string;
+  warning: string;
+  count: number;
+  items: ExternalGalleryItem[];
+  facets: {
+    system: string[];
+    category: string[];
+    angle: string[];
+    tag: string[];
+  };
+}
+
 export interface InpaintSource {
   source_id: string;
   width: number;
@@ -1893,6 +2305,35 @@ export interface VideoTask {
 export interface VideoJobStatus {
   record: VideoRecord | null;
   task: VideoTask | null;
+}
+
+export interface LongVideoSegment {
+  index: number;
+  prompt: string;
+  seed: number;
+  status: 'pending' | 'running' | 'ready' | 'failed';
+  attempts: number;
+  video_name: string;
+  error: string;
+}
+
+export interface LongVideoState {
+  version: number;
+  job_id: string;
+  status: 'running' | 'error' | 'stopped' | 'interrupted' | 'done';
+  created_at: string;
+  updated_at: string;
+  error: string;
+  params: Record<string, unknown>;
+  segments: LongVideoSegment[];
+  final_video_name: string;
+  final_url: string;
+}
+
+export interface LongVideoStatus {
+  state: LongVideoState;
+  task: VideoTask | null;
+  record: VideoRecord | null;
 }
 
 export interface CompanionPersona {

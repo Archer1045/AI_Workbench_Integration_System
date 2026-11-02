@@ -1,0 +1,1472 @@
+[
+  {
+    "id": "outfit_user_20261101_priconne_pecorine_default",
+    "character_preset_id": "appearance_priconne_pecorine",
+    "label": "佩可莉姆 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white blouse",
+      "blue corset",
+      "blue skirt",
+      "white gloves",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_priconne_kokkoro_default",
+    "character_preset_id": "appearance_priconne_kokkoro",
+    "label": "可可萝 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white dress",
+      "green capelet",
+      "brown belt",
+      "white thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_priconne_karyl_default",
+    "character_preset_id": "appearance_priconne_karyl",
+    "label": "凯露 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black hooded cloak",
+      "white dress",
+      "black thighhighs",
+      "black boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_priconne_yui_default",
+    "character_preset_id": "appearance_priconne_yui",
+    "label": "优衣 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "pastel school uniform",
+      "white blouse",
+      "pink jacket",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_priconne_hatsune_default",
+    "character_preset_id": "appearance_priconne_hatsune",
+    "label": "初音 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_priconne_makoto_default",
+    "character_preset_id": "appearance_priconne_makoto",
+    "label": "真琴 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "blue dress",
+      "dark belt",
+      "black gloves",
+      "black boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_priconne_shizuru_default",
+    "character_preset_id": "appearance_priconne_shizuru",
+    "label": "静流 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "purple jacket",
+      "dark pleated skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_priconne_rino_default",
+    "character_preset_id": "appearance_priconne_rino",
+    "label": "璃乃 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white frilled dress",
+      "blue ribbon",
+      "white thighhighs",
+      "brown boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_priconne_miyako_default",
+    "character_preset_id": "appearance_priconne_miyako",
+    "label": "宫子 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white dress",
+      "blue ribbon",
+      "white stockings"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_priconne_kuuka_default",
+    "character_preset_id": "appearance_priconne_kuuka",
+    "label": "空花 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black dress",
+      "red accents",
+      "black gloves",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_lycoris_chisato_default",
+    "character_preset_id": "appearance_lycoris_chisato",
+    "label": "锦木千束 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white shirt",
+      "red pleated skirt",
+      "dark blue jacket",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_lycoris_takina_default",
+    "character_preset_id": "appearance_lycoris_takina",
+    "label": "井之上泷奈 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white shirt",
+      "blue necktie",
+      "dark blazer",
+      "blue pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_lycoris_kurumi_default",
+    "character_preset_id": "appearance_lycoris_kurumi",
+    "label": "胡桃（莉可丽丝） 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "yellow hoodie",
+      "shorts",
+      "white socks",
+      "sneakers"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_lycoris_mizuki_default",
+    "character_preset_id": "appearance_lycoris_mizuki",
+    "label": "中原瑞希 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white cafe blouse",
+      "brown apron",
+      "dark skirt",
+      "black stockings"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_lycoris_kusunoki_default",
+    "character_preset_id": "appearance_lycoris_kusunoki",
+    "label": "楠木 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black suit",
+      "white shirt",
+      "black necktie"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_lycoris_fuki_default",
+    "character_preset_id": "appearance_lycoris_fuki",
+    "label": "春川蕗 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white shirt",
+      "black necktie",
+      "gray skirt",
+      "dark blazer",
+      "lilybell uniform"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_lycoris_sakura_default",
+    "character_preset_id": "appearance_lycoris_sakura",
+    "label": "乙女樱 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white shirt",
+      "green necktie",
+      "dark skirt",
+      "dark blazer",
+      "lilybell uniform"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_tohka_default",
+    "character_preset_id": "appearance_dal_tohka",
+    "label": "夜刀神十香 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "purple and black spirit dress",
+      "armored boots",
+      "thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_kurumi_default",
+    "character_preset_id": "appearance_dal_kurumi",
+    "label": "时崎狂三 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black gothic dress",
+      "red ribbon",
+      "black thighhighs",
+      "black boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_origami_default",
+    "character_preset_id": "appearance_dal_origami",
+    "label": "鸢一折纸 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white AST uniform",
+      "blue accents",
+      "white thighhighs",
+      "armored boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_kotori_default",
+    "character_preset_id": "appearance_dal_kotori",
+    "label": "五河琴里 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "red commander uniform",
+      "black skirt",
+      "black thighhighs",
+      "boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_yoshino_default",
+    "character_preset_id": "appearance_dal_yoshino",
+    "label": "四糸乃 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white winter coat",
+      "green dress",
+      "white thighhighs",
+      "boots",
+      "rabbit hood"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_kaguya_default",
+    "character_preset_id": "appearance_dal_kaguya",
+    "label": "八舞耶俱矢 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black and red spirit dress",
+      "detached sleeves",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_yuzuru_default",
+    "character_preset_id": "appearance_dal_yuzuru",
+    "label": "八舞夕弦 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "purple and black spirit dress",
+      "detached sleeves",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_miku_default",
+    "character_preset_id": "appearance_dal_miku",
+    "label": "诱宵美九 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white and purple idol dress",
+      "detached sleeves",
+      "white thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_natsumi_default",
+    "character_preset_id": "appearance_dal_natsumi",
+    "label": "七罪 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "green and black witch dress",
+      "brown boots",
+      "witch hat"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_dal_mukuro_default",
+    "character_preset_id": "appearance_dal_mukuro",
+    "label": "星宫六喰 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "dark blue spirit dress",
+      "gold ornaments",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_m4a1_default",
+    "character_preset_id": "appearance_gfl_m4a1",
+    "label": "M4A1 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "green tactical uniform",
+      "armored boots",
+      "tactical gloves"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_ar15_default",
+    "character_preset_id": "appearance_gfl_ar15",
+    "label": "ST AR-15 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical uniform",
+      "armored boots",
+      "tactical gloves"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_m16a1_default",
+    "character_preset_id": "appearance_gfl_m16a1",
+    "label": "M16A1 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "green military jacket",
+      "black tactical pants",
+      "combat boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_sopmod2_default",
+    "character_preset_id": "appearance_gfl_sopmod2",
+    "label": "SOPMOD II 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical suit",
+      "armored limbs",
+      "combat boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_ak12_default",
+    "character_preset_id": "appearance_gfl_ak12",
+    "label": "AK-12 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white and black tactical uniform",
+      "armored boots",
+      "tactical gloves"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_an94_default",
+    "character_preset_id": "appearance_gfl_an94",
+    "label": "AN-94 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white and blue tactical uniform",
+      "armored boots",
+      "tactical gloves"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_hk416_default",
+    "character_preset_id": "appearance_gfl_hk416",
+    "label": "HK416 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical uniform",
+      "armored boots",
+      "tactical gloves"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_g11_default",
+    "character_preset_id": "appearance_gfl_g11",
+    "label": "G11 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical dress",
+      "detached sleeves",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_ump45_default",
+    "character_preset_id": "appearance_gfl_ump45",
+    "label": "UMP45 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical jacket",
+      "shorts",
+      "black thighhighs",
+      "combat boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_ump9_default",
+    "character_preset_id": "appearance_gfl_ump9",
+    "label": "UMP9 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical jacket",
+      "shorts",
+      "black thighhighs",
+      "combat boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_vector_default",
+    "character_preset_id": "appearance_gfl_vector",
+    "label": "Vector 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical coat",
+      "black shorts",
+      "black thighhighs",
+      "combat boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_ro635_default",
+    "character_preset_id": "appearance_gfl_ro635",
+    "label": "RO635 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical uniform",
+      "armored boots",
+      "tactical gloves"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_ots14_default",
+    "character_preset_id": "appearance_gfl_ots14",
+    "label": "OTs-14 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical dress",
+      "detached sleeves",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_rfb_default",
+    "character_preset_id": "appearance_gfl_rfb",
+    "label": "RFB 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black tactical jacket",
+      "short shorts",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_springfield_default",
+    "character_preset_id": "appearance_gfl_springfield",
+    "label": "春田 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white blouse",
+      "brown vest",
+      "red skirt",
+      "brown boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_wa2000_default",
+    "character_preset_id": "appearance_gfl_wa2000",
+    "label": "WA2000 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "red and black dress",
+      "white gloves",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_kar98k_default",
+    "character_preset_id": "appearance_gfl_kar98k",
+    "label": "Kar98k 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black military uniform",
+      "red accents",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_suomi_default",
+    "character_preset_id": "appearance_gfl_suomi",
+    "label": "Suomi KP-31 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white and blue winter uniform",
+      "white thighhighs",
+      "boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_welrod_default",
+    "character_preset_id": "appearance_gfl_welrod",
+    "label": "Welrod MkII 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black formal suit",
+      "white shirt",
+      "black necktie"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_gfl_lee_enfield_default",
+    "character_preset_id": "appearance_gfl_lee_enfield",
+    "label": "李-恩菲尔德 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "brown military uniform",
+      "black boots",
+      "tactical gloves"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_quint_ichika_default",
+    "character_preset_id": "appearance_quint_ichika",
+    "label": "中野一花 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "dark necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_quint_nino_default",
+    "character_preset_id": "appearance_quint_nino",
+    "label": "中野二乃 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "dark necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_quint_miku_default",
+    "character_preset_id": "appearance_quint_miku",
+    "label": "中野三玖 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "dark necktie",
+      "dark pleated skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_quint_yotsuba_default",
+    "character_preset_id": "appearance_quint_yotsuba",
+    "label": "中野四叶 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "green necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_quint_itsuki_default",
+    "character_preset_id": "appearance_quint_itsuki",
+    "label": "中野五月 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "red necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_elaina_elaina_default",
+    "character_preset_id": "appearance_elaina_elaina",
+    "label": "伊蕾娜 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black witch robe",
+      "white blouse",
+      "black cape",
+      "brown boots",
+      "black witch hat"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_elaina_fran_default",
+    "character_preset_id": "appearance_elaina_fran",
+    "label": "芙兰 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black witch robe",
+      "white blouse",
+      "black skirt",
+      "black witch hat"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_elaina_saya_default",
+    "character_preset_id": "appearance_elaina_saya",
+    "label": "沙耶 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white witch dress",
+      "black cape",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_elaina_amnesia_default",
+    "character_preset_id": "appearance_elaina_amnesia",
+    "label": "艾姆妮西亚 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white and purple traveler dress",
+      "cape",
+      "boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_yukino_default",
+    "character_preset_id": "appearance_oregairu_yukino",
+    "label": "雪之下雪乃 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "red necktie",
+      "dark pleated skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_yui_default",
+    "character_preset_id": "appearance_oregairu_yui",
+    "label": "由比滨结衣 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "red necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_iroha_default",
+    "character_preset_id": "appearance_oregairu_iroha",
+    "label": "一色伊吕波 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "red necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_komachi_default",
+    "character_preset_id": "appearance_oregairu_komachi",
+    "label": "比企谷小町 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "school uniform",
+      "white blouse",
+      "dark skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_haruno_default",
+    "character_preset_id": "appearance_oregairu_haruno",
+    "label": "雪之下阳乃 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "casual blouse",
+      "dark skirt",
+      "black tights"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_hiratsuka_default",
+    "character_preset_id": "appearance_oregairu_hiratsuka",
+    "label": "平冢静 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white lab coat",
+      "black shirt",
+      "dark trousers"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_kawasaki_default",
+    "character_preset_id": "appearance_oregairu_kawasaki",
+    "label": "川崎沙希 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "red necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_meguri_default",
+    "character_preset_id": "appearance_oregairu_meguri",
+    "label": "城廻巡 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "school uniform",
+      "white blouse",
+      "dark skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_rumi_default",
+    "character_preset_id": "appearance_oregairu_rumi",
+    "label": "鹤见留美 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "school uniform",
+      "white shirt",
+      "dark skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_oregairu_ebina_default",
+    "character_preset_id": "appearance_oregairu_ebina",
+    "label": "海老名姬菜 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "red necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_asuna_default",
+    "character_preset_id": "appearance_sao_asuna",
+    "label": "结城明日奈 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white and red knight uniform",
+      "red skirt",
+      "white thighhighs",
+      "boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_leafa_default",
+    "character_preset_id": "appearance_sao_leafa",
+    "label": "桐谷直叶 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "green fairy outfit",
+      "white thighhighs",
+      "brown boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_sinon_default",
+    "character_preset_id": "appearance_sao_sinon",
+    "label": "朝田诗乃 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "blue tactical outfit",
+      "white scarf",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_alice_default",
+    "character_preset_id": "appearance_sao_alice",
+    "label": "爱丽丝·滋贝鲁库 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "golden armor",
+      "blue dress",
+      "white cape"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_lisbeth_default",
+    "character_preset_id": "appearance_sao_lisbeth",
+    "label": "筱崎里香 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "blacksmith outfit",
+      "brown apron",
+      "dark shorts"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_silica_default",
+    "character_preset_id": "appearance_sao_silica",
+    "label": "绫野珪子 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "brown fantasy dress",
+      "cape",
+      "boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_yui_default",
+    "character_preset_id": "appearance_sao_yui",
+    "label": "结衣 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white dress",
+      "black ribbons"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_sachi_default",
+    "character_preset_id": "appearance_sao_sachi",
+    "label": "幸 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "brown cloak",
+      "white shirt",
+      "dark skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_yuna_default",
+    "character_preset_id": "appearance_sao_yuna",
+    "label": "尤娜 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white idol dress",
+      "pink accents",
+      "white boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_sao_quinella_default",
+    "character_preset_id": "appearance_sao_quinella",
+    "label": "Administrator 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white and gold gown",
+      "gold ornaments"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_accel_kuroyukihime_default",
+    "character_preset_id": "appearance_accel_kuroyukihime",
+    "label": "黑雪姬 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black school uniform",
+      "short skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_accel_chiyuri_default",
+    "character_preset_id": "appearance_accel_chiyuri",
+    "label": "仓岛千百合 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "dark skirt",
+      "school uniform"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_accel_fuuko_default",
+    "character_preset_id": "appearance_accel_fuuko",
+    "label": "仓崎枫子 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "gray school uniform",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_accel_yuniko_default",
+    "character_preset_id": "appearance_accel_yuniko",
+    "label": "上月由仁子 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "red and black outfit",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_accel_megumi_default",
+    "character_preset_id": "appearance_accel_megumi",
+    "label": "若宫惠 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "purple dress",
+      "white gloves",
+      "boots"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_accel_utai_default",
+    "character_preset_id": "appearance_accel_utai",
+    "label": "四埜宫谣 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "shrine maiden outfit",
+      "red hakama",
+      "white haori"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_accel_rin_default",
+    "character_preset_id": "appearance_accel_rin",
+    "label": "日下部凛 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "blue school uniform",
+      "white accents",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_bunny_mai_default",
+    "character_preset_id": "appearance_bunny_mai",
+    "label": "樱岛麻衣 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black bunny suit",
+      "white collar",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_bunny_tomoe_default",
+    "character_preset_id": "appearance_bunny_tomoe",
+    "label": "古贺朋绘 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "green necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_bunny_rio_default",
+    "character_preset_id": "appearance_bunny_rio",
+    "label": "双叶理央 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white lab coat",
+      "dark shirt",
+      "dark skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_bunny_kaede_default",
+    "character_preset_id": "appearance_bunny_kaede",
+    "label": "梓川枫 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "casual white dress",
+      "pink cardigan",
+      "white socks"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_bunny_nodoka_default",
+    "character_preset_id": "appearance_bunny_nodoka",
+    "label": "丰滨和香 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "idol stage dress",
+      "white gloves",
+      "white thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_bunny_shoko_default",
+    "character_preset_id": "appearance_bunny_shoko",
+    "label": "牧之原翔子 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white dress",
+      "blue cardigan",
+      "white socks"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_shiroko_default",
+    "character_preset_id": "appearance_ba_shiroko",
+    "label": "砂狼白子 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt",
+      "blue jacket"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_hoshino_default",
+    "character_preset_id": "appearance_ba_hoshino",
+    "label": "小鸟游星野 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt",
+      "blue jacket"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_ayane_default",
+    "character_preset_id": "appearance_ba_ayane",
+    "label": "奥空绫音 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt",
+      "blue jacket"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_serika_default",
+    "character_preset_id": "appearance_ba_serika",
+    "label": "黑见芹香 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt",
+      "blue jacket"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_nonomi_default",
+    "character_preset_id": "appearance_ba_nonomi",
+    "label": "十六夜野宫 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt",
+      "blue jacket"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_hina_default",
+    "character_preset_id": "appearance_ba_hina",
+    "label": "空崎日奈 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black and purple school uniform",
+      "dark skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_aru_default",
+    "character_preset_id": "appearance_ba_aru",
+    "label": "陆八魔阿露 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black long coat",
+      "white shirt",
+      "red necktie",
+      "dark skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_mutsuki_default",
+    "character_preset_id": "appearance_ba_mutsuki",
+    "label": "浅黄睦月 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black school blouse",
+      "red necktie",
+      "dark skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_kayoko_default",
+    "character_preset_id": "appearance_ba_kayoko",
+    "label": "鬼方佳代子 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black school blouse",
+      "red necktie",
+      "dark skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_aris_default",
+    "character_preset_id": "appearance_ba_aris",
+    "label": "天童爱丽丝 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_yuuka_default",
+    "character_preset_id": "appearance_ba_yuuka",
+    "label": "早濑优香 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt",
+      "blue jacket"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_noa_default",
+    "character_preset_id": "appearance_ba_noa",
+    "label": "生盐诺亚 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt",
+      "blue jacket"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_azusa_default",
+    "character_preset_id": "appearance_ba_azusa",
+    "label": "白洲梓 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white school blouse",
+      "blue necktie",
+      "dark pleated skirt"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_shun_default",
+    "character_preset_id": "appearance_ba_shun",
+    "label": "春原瞬 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black qipao",
+      "gold accents",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_hasumi_default",
+    "character_preset_id": "appearance_ba_hasumi",
+    "label": "羽川莲见 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white and black uniform",
+      "white cape",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_tsurugi_default",
+    "character_preset_id": "appearance_ba_tsurugi",
+    "label": "剑先鹤城 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white and red uniform",
+      "black skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_wakamo_default",
+    "character_preset_id": "appearance_ba_wakamo",
+    "label": "狐坂若藻 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black and red kimono",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_miyako_default",
+    "character_preset_id": "appearance_ba_miyako",
+    "label": "月雪宫子 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white tactical uniform",
+      "blue accents",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_iori_default",
+    "character_preset_id": "appearance_ba_iori",
+    "label": "银镜伊织 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "black school uniform",
+      "red necktie",
+      "dark skirt",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_neru_default",
+    "character_preset_id": "appearance_ba_neru",
+    "label": "室笠音瑠 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "white maid uniform",
+      "black corset",
+      "black thighhighs"
+    ],
+    "source": "user"
+  },
+  {
+    "id": "outfit_user_20261101_ba_toki_bunny_default",
+    "character_preset_id": "appearance_ba_toki_bunny",
+    "label": "飞鸟马时（兔女郎） 默认服装",
+    "translation": "由角色预设独立拆分的默认服装，可在服装库中单独选择。",
+    "category": "角色服装",
+    "tags": [
+      "non-sexual black bunny suit",
+      "white collar",
+      "opaque black tights",
+      "bunny ears"
+    ],
+    "source": "user"
+  }
+]

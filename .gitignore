@@ -8,6 +8,8 @@ frontend/vite.config.d.ts
 frontend/vitest.config.js
 frontend/vitest.config.d.ts
 frontend/*.tsbuildinfo
+frontend/npm.cmd
+frontend/npx.cmd
 test_output.png
 .env
 

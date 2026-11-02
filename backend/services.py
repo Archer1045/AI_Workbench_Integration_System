@@ -39,8 +39,32 @@ def gpu_status() -> dict:
         "memory_total_mb": 0,
         "temperature_c": 0,
         "power_w": 0,
+        "cpu_percent": 0,
+        "ram_used_mb": 0,
+        "ram_total_mb": 0,
+        "disk_free_gb": 0,
+        "disk_total_gb": 0,
+        "process_memory_mb": 0,
         "active_models": [],
     }
+    try:
+        cpu_percent = psutil.cpu_percent(interval=None)
+        ram = psutil.virtual_memory()
+        disk_root = os.path.splitdrive(str(config.AI_PRODUCT_DIR))[0] + os.sep
+        disk = psutil.disk_usage(disk_root)
+        process_memory = psutil.Process(os.getpid()).memory_info().rss
+        data.update(
+            {
+                "cpu_percent": int(round(cpu_percent)),
+                "ram_used_mb": int((ram.total - ram.available) / 1024 / 1024),
+                "ram_total_mb": int(ram.total / 1024 / 1024),
+                "disk_free_gb": round(disk.free / 1024 / 1024 / 1024, 1),
+                "disk_total_gb": round(disk.total / 1024 / 1024 / 1024, 1),
+                "process_memory_mb": int(process_memory / 1024 / 1024),
+            }
+        )
+    except Exception:
+        pass
     try:
         result = subprocess.run(
             [

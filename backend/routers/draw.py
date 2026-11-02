@@ -22,6 +22,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 import content_filter
 import config
 import database
+import generation_specs
 import prompt_document
 import task_state
 import task_registry
@@ -743,6 +744,10 @@ def _persist_job(job: dict) -> None:
 def _validate_model(model: str) -> str:
     """校验底模名称，返回可用模型名。"""
     model = str(model or DEFAULT_MODEL)
+    try:
+        generation_specs.require_workflow_supported(model)
+    except generation_specs.GenerationSpecError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     available = {item["name"] for item in list_diffusion_models()}
     if model not in available:
         raise HTTPException(status_code=400, detail="未知的底模")
@@ -838,8 +843,8 @@ def _parse_lora_strengths(raw: object) -> dict[str, dict[str, float]]:
     return result
 
 
-def _parse_draw_settings(payload: dict) -> dict:
-    return {
+def _parse_draw_settings(payload: dict, model: str) -> dict:
+    settings = {
         "width": _parse_int_param(
             payload,
             "width",
@@ -883,6 +888,23 @@ def _parse_draw_settings(payload: dict) -> dict:
         ),
         "lora_strengths": _parse_lora_strengths(payload.get("lora_strengths")),
     }
+
+
+    width, height, profile = generation_specs.normalize_size(
+        model,
+        settings["width"],
+        settings["height"],
+        str(payload.get("aspect_ratio") or ""),
+        min_width=config.DRAW_WIDTH_MIN,
+        max_width=config.DRAW_WIDTH_MAX,
+        min_height=config.DRAW_HEIGHT_MIN,
+        max_height=config.DRAW_HEIGHT_MAX,
+    )
+    settings["width"] = width
+    settings["height"] = height
+    settings["aspect_ratio"] = str(payload.get("aspect_ratio") or "Free")
+    settings["generation_profile"] = profile.id
+    return settings
 
 
 def _resolve_draw_document(
@@ -1710,7 +1732,37 @@ def unprotect_lora(filename: str) -> dict:
 @router.get("/api/models")
 def get_models() -> dict:
     """返回可选的绘画底模列表和默认底模。"""
-    return {"models": list_diffusion_models(), "default": DEFAULT_MODEL}
+    models = []
+    for item in list_diffusion_models():
+        models.append(
+            {
+                **item,
+                **generation_specs.describe_model(
+                    item["name"],
+                    min_size=config.DRAW_WIDTH_MIN,
+                    max_size=config.DRAW_WIDTH_MAX,
+                ),
+            }
+        )
+    profiles = [
+        generation_specs.describe_profile(
+            profile,
+            min_size=config.DRAW_WIDTH_MIN,
+            max_size=config.DRAW_WIDTH_MAX,
+        )
+        for profile in generation_specs.PROFILES.values()
+    ]
+    return {
+        "models": models,
+        "default": DEFAULT_MODEL,
+        "default_generation": generation_specs.describe_model(
+            DEFAULT_MODEL,
+            min_size=config.DRAW_WIDTH_MIN,
+            max_size=config.DRAW_WIDTH_MAX,
+        ),
+        "profiles": profiles,
+        "aspect_ratios": [dict(item) for item in generation_specs.ASPECT_RATIOS],
+    }
 
 
 @router.get("/api/images/library")
@@ -1875,7 +1927,7 @@ def draw_batch(payload: dict = Body(...)):
         labels = "、".join(task["label"] for task in other_tasks)
         raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
 
-    settings = _parse_draw_settings(payload)
+    settings = _parse_draw_settings(payload, model)
     generation_config = {
         "negative_prompt": fallback_negative,
         **settings,
@@ -1980,7 +2032,7 @@ def draw(payload: dict = Body(...)):
     if other_tasks:
         labels = "、".join(task["label"] for task in other_tasks)
         raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
-    settings = _parse_draw_settings(payload)
+    settings = _parse_draw_settings(payload, model)
     result = _generate_and_record(
         prompt,
         negative_prompt,

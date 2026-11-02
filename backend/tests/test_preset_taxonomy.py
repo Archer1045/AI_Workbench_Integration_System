@@ -7,6 +7,7 @@ import expansion_presets
 import preset_taxonomy
 import prompt_agent
 import scene_presets
+import scene_presets_20261102
 import toy_presets
 
 
@@ -38,6 +39,30 @@ def test_all_presets_have_valid_two_level_taxonomy_and_asset_intents() -> None:
     assert len(preset_taxonomy.CATEGORY_GROUPS["clothing"]) == 7
     assert len(preset_taxonomy.CATEGORY_GROUPS["scene"]) == 5
     assert len(preset_taxonomy.CATEGORY_GROUPS["body"]) == 5
+
+
+def test_new_daily_and_private_scene_batch_is_valid_and_mirror_free() -> None:
+    definitions = scene_presets_20261102.SCENE_PRESET_DEFINITIONS
+    ids = [item["id"] for item in definitions]
+    assert len(definitions) == 34
+    assert len(ids) == len(set(ids))
+    assert sum(item["rating"] == "普通" for item in definitions) == 21
+    assert sum(item["rating"] == "R18" for item in definitions) == 13
+    assert "mirror" not in repr(definitions).lower()
+    assert "镜面" not in repr(definitions)
+    assert "镜子" not in repr(definitions)
+
+    assert len(scene_presets.SCENE_PRESETS) == 252
+    assert len(scene_presets.DAILY_SCENE_IDS) == 21
+    assert len(scene_presets.PRIVATE_SCENE_IDS) == 13
+    by_id = {item["id"]: item for item in scene_presets.SCENE_PRESETS}
+    enriched = {item["id"]: item for item in _enriched("scene")}
+    assert set(ids) <= set(by_id)
+    for preset_id in ids:
+        preset = by_id[preset_id]
+        assert preset["image"] is None
+        assert preset["has_image"] is False
+        assert enriched[preset_id]["category_group"] in preset_taxonomy.CATEGORY_GROUPS["scene"]
 
 
 def test_explicit_asset_intent_ids_exist() -> None:

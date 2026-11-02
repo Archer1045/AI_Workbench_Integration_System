@@ -53,6 +53,13 @@ type SplitGroups = Record<string, string[]>;
 
 type PosePreset = PoseCatalogItem;
 
+interface PromptProfileOption {
+  id: string;
+  label: string;
+  description: string;
+  instruction: string;
+}
+
 function promptHasTags(prompt: string, tags: string[]): boolean {
   const existing = new Set(prompt.toLowerCase().split(',').map((part) => part.trim()).filter(Boolean));
   return tags.length > 0 && tags.every((tag) => existing.has(tag.toLowerCase()));
@@ -96,8 +103,15 @@ export default function PromptAgent() {
   const [selectedClothingId, setSelectedClothingId] = useState('');
   const [clothingScope, setClothingScope] = useState<ClothingScope>('all');
   const [refineRequirements, setRefineRequirements] = useState('');
+  const [promptProfiles, setPromptProfiles] = useState<PromptProfileOption[]>([]);
+  const [promptProfile, setPromptProfile] = useState('general');
   const [refining, setRefining] = useState(false);
-  const [refined, setRefined] = useState<{ prompt: string; translation: string; groups: PromptGroup[] } | null>(null);
+  const [refined, setRefined] = useState<{
+    prompt: string;
+    translation: string;
+    groups: PromptGroup[];
+    profileLabel?: string;
+  } | null>(null);
   const [tagTranslations, setTagTranslations] = useState<Record<string, string>>({});
   const [validationIssues, setValidationIssues] = useState<PromptValidationIssue[]>([]);
   const [vlmModel, setVlmModel] = useState('');
@@ -127,6 +141,15 @@ export default function PromptAgent() {
     api
       .get<{ model: string }>('/settings/vlm-model')
       .then((res) => setVlmModel(res.data.model || ''))
+      .catch(() => undefined);
+    api
+      .get<{ items: PromptProfileOption[]; default: string }>(
+        '/prompt-agent/prompt-profiles',
+      )
+      .then((res) => {
+        setPromptProfiles(res.data.items || []);
+        setPromptProfile(res.data.default || 'general');
+      })
       .catch(() => undefined);
   }, []);
 
@@ -241,13 +264,25 @@ export default function PromptAgent() {
     try {
       const selectedPose = posePresets.find((item) => item.id === selectedPoseId);
       const poseAlreadyInPrompt = selectedPose ? promptHasTags(result.prompt, selectedPose.tags) : false;
-      const { data } = await api.post<{ prompt: string; prompt_translation: string; groups: PromptGroup[] }>('/prompt-agent/refine', {
+      const { data } = await api.post<{
+        prompt: string;
+        prompt_translation: string;
+        groups: PromptGroup[];
+        profile_id: string;
+        profile_label: string;
+      }>('/prompt-agent/refine', {
         description: result.description || '',
         prompt: result.prompt,
         requirements: refineRequirements,
+        prompt_profile: promptProfile,
         pose_preset_id: selectedPoseId && !poseAlreadyInPrompt ? selectedPoseId : undefined,
       });
-      setRefined({ prompt: data.prompt, translation: data.prompt_translation, groups: data.groups });
+      setRefined({
+        prompt: data.prompt,
+        translation: data.prompt_translation,
+        groups: data.groups,
+        profileLabel: data.profile_label,
+      });
       void loadTranslations(data.groups.flatMap((group) => group.items));
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: string } } }).response?.data?.detail;
@@ -656,6 +691,17 @@ export default function PromptAgent() {
                     </div>
                   );
                 })}
+                <Select
+                  value={promptProfile}
+                  options={promptProfiles.map((item) => ({
+                    label: item.label,
+                    value: item.id,
+                    title: item.description,
+                  }))}
+                  onChange={setPromptProfile}
+                  style={{ width: '100%', marginTop: 8 }}
+                  placeholder="选择目标模型提示词规则"
+                />
                 <Input.TextArea
                   rows={2}
                   value={refineRequirements}
