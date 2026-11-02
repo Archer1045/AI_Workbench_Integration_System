@@ -384,6 +384,12 @@ def test_person_thumbnail_templates_keep_head_and_face_visible(workshop):
             "faceless",
         ):
             assert value in layers["type_negative"], (preset_type, value)
+        assert "one continuous single-scene illustration" in layers["thumbnail_positive"]
+        assert "no background duplicate" in layers["thumbnail_positive"]
+        assert "character sheet" in layers["thumbnail_negative"]
+        assert "ghosted duplicate" in layers["thumbnail_negative"]
+        assert "clear detailed face" in layers["thumbnail_positive"]
+        assert "blank face" in layers["thumbnail_negative"]
         if preset_type == "character":
             assert snapshot["preset_version"] == int(preset["version"])
 
@@ -398,6 +404,55 @@ def test_person_thumbnail_templates_keep_head_and_face_visible(workshop):
     assert "face fully inside frame" not in scene_layers["type_positive"]
     assert "close-up framing" not in scene_layers["type_negative"]
     assert "cropped head" not in scene_layers["type_negative"]
+
+
+def test_multi_person_thumbnail_templates_match_pose_people_count(workshop):
+    import prompt_agent
+
+    duo = pipeline.build_prompt_snapshot(
+        "pose",
+        "duo_handshake",
+        {"model": "mock.safetensors"},
+    )
+    duo_layers = duo["prompt_layers"]
+    assert "exactly one adult anime woman" not in duo_layers["thumbnail_positive"]
+    assert "exactly two adult anime characters" in duo_layers["thumbnail_positive"]
+    assert "two separate independent bodies" in duo_layers["thumbnail_positive"]
+    assert "solo" in duo_layers["thumbnail_negative"]
+    assert "three or more people" in duo_layers["thumbnail_negative"]
+
+    trio_id = next(
+        item["id"]
+        for item in prompt_agent.POSE_PRESETS
+        if int(item.get("people_count") or 0) == 3
+    )
+    trio = pipeline.build_prompt_snapshot(
+        "pose",
+        trio_id,
+        {"model": "mock.safetensors"},
+    )
+    trio_layers = trio["prompt_layers"]
+    assert "exactly three adult anime characters" in trio_layers["thumbnail_positive"]
+    assert "three separate independent bodies" in trio_layers["thumbnail_positive"]
+    assert "only two people" in trio_layers["thumbnail_negative"]
+
+    duo_preset = next(
+        item for item in prompt_agent.POSE_PRESETS if item["id"] == "duo_handshake"
+    )
+    failures, _warnings = pipeline._thumbnail_validation_outcome(
+        "pose",
+        duo_preset,
+        "full_body",
+        False,
+        {
+            "people_total": 1,
+            "head_visible": True,
+            "face_visible": True,
+            "feet_visible": True,
+            "front_facing": True,
+        },
+    )
+    assert "2_person_required" in failures
 
 
 def test_toy_thumbnail_uses_single_character_context(workshop):

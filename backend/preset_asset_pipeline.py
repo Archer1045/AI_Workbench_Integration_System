@@ -137,6 +137,24 @@ _SINGLE_PERSON_NEGATIVE = (
     "1boy, male, man, 2girls, 2boys, multiple girls, multiple boys, couple, second person, "
     "extra person, additional character, duplicate subject"
 )
+_DUO_PERSON_POSITIVE = (
+    "exactly two adult anime characters, two separate independent bodies, "
+    "both people fully visible with consistent individual identities, "
+    "wide balanced two-person composition"
+)
+_DUO_PERSON_NEGATIVE = (
+    "only one person, solo, three or more people, missing second person, "
+    "merged bodies, duplicate character, cropped second person"
+)
+_TRIPLE_PERSON_POSITIVE = (
+    "exactly three adult anime characters, three separate independent bodies, "
+    "all three people fully visible with consistent individual identities, "
+    "wide balanced three-person composition"
+)
+_TRIPLE_PERSON_NEGATIVE = (
+    "fewer than three people, solo, only two people, missing person, "
+    "four or more people, merged bodies, duplicate character, cropped third person"
+)
 _UPPER_BODY_FRAMING_POSITIVE = (
     "upper-body clothing presentation, complete head and face visible, "
     "shoulders and chest fully inside frame, complete featured upper garment visible"
@@ -182,6 +200,22 @@ _ACTION_FLEX_POSITIVE = (
 )
 _ACTION_FLEX_NEGATIVE = (
     "awkward pose, broken anatomy, disconnected limbs, incoherent composition"
+)
+_SINGLE_SCENE_POSITIVE = (
+    "one continuous single-scene illustration filling the frame, one copy of each "
+    "subject, no inset images, no character sheet, no background duplicate"
+)
+_SINGLE_SCENE_NEGATIVE = (
+    "collage, multiple panels, split composition, reference sheet, character sheet, "
+    "turnaround sheet, inset view, ghosted duplicate, translucent background figure, "
+    "oversized background character, duplicated torso, repeated face"
+)
+_CLEAR_FACE_POSITIVE = (
+    "clear detailed face, visible eyes, nose and mouth, coherent symmetrical facial features"
+)
+_CLEAR_FACE_NEGATIVE = (
+    "blank face, featureless face, erased face, missing facial features, "
+    "missing eyes, missing nose, missing mouth, mannequin head"
 )
 _TOY_CHARACTER_CONTEXT_POSITIVE = (
     "featured visual toy presented with exactly one adult woman, the character "
@@ -534,6 +568,27 @@ def _preset_requires_front_back(preset: dict[str, Any]) -> bool:
     return any(marker in text for marker in _BACK_FOCUS_MARKERS)
 
 
+def _thumbnail_expected_people(preset_type: str, preset: dict[str, Any]) -> int:
+    if preset_type != "pose":
+        return 1
+    try:
+        return max(1, int(preset.get("people_count") or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _thumbnail_people_constraints(
+    preset_type: str,
+    preset: dict[str, Any],
+) -> tuple[str, str]:
+    expected_people = _thumbnail_expected_people(preset_type, preset)
+    if expected_people == 2:
+        return _DUO_PERSON_POSITIVE, _DUO_PERSON_NEGATIVE
+    if expected_people >= 3:
+        return _TRIPLE_PERSON_POSITIVE, _TRIPLE_PERSON_NEGATIVE
+    return _SINGLE_PERSON_POSITIVE, _SINGLE_PERSON_NEGATIVE
+
+
 def _thumbnail_prompt_constraints(
     preset_type: str,
     preset: dict[str, Any],
@@ -541,8 +596,11 @@ def _thumbnail_prompt_constraints(
     framing = resolve_thumbnail_framing(preset_type, preset)
     mode = framing["mode"]
     scene = ""
+    expected_people = _thumbnail_expected_people(preset_type, preset)
     front_back_required = (
-        preset_type != "scene" and _preset_requires_front_back(preset)
+        preset_type != "scene"
+        and expected_people == 1
+        and _preset_requires_front_back(preset)
     )
     if mode == "toy_character_context":
         positive_parts = [
@@ -600,15 +658,23 @@ def _thumbnail_prompt_constraints(
             scene,
             front_back_required,
         )
+    person_positive, person_negative = _thumbnail_people_constraints(
+        preset_type,
+        preset,
+    )
     positive_parts: list[str] = [
-        _SINGLE_PERSON_POSITIVE,
+        person_positive,
+        _SINGLE_SCENE_POSITIVE,
         _FRONT_LIGHT_POSITIVE,
         _ACTION_FLEX_POSITIVE,
+        _CLEAR_FACE_POSITIVE,
     ]
     negative_parts: list[str] = [
-        _SINGLE_PERSON_NEGATIVE,
+        person_negative,
+        _SINGLE_SCENE_NEGATIVE,
         _FRONT_LIGHT_NEGATIVE,
         _ACTION_FLEX_NEGATIVE,
+        _CLEAR_FACE_NEGATIVE,
     ]
     if front_back_required:
         positive_parts.append(_FRONT_BACK_VIEW_POSITIVE)
@@ -702,11 +768,16 @@ def _thumbnail_validation_outcome(
     failures: list[str] = []
     warnings: list[str] = []
     people_total = int(data.get("people_total") or 0)
+    expected_people = _thumbnail_expected_people(preset_type, preset)
     if expected_mode == "expansion_internal":
         if people_total != 1:
             warnings.append("people_count_manual_review_required")
-    elif people_total != 1:
-        failures.append("single_person_required")
+    elif people_total != expected_people:
+        failures.append(
+            "single_person_required"
+            if expected_people == 1
+            else f"{expected_people}_person_required"
+        )
     if expected_mode != "expansion_internal" and not bool(data.get("head_visible")):
         failures.append("full_head_required")
     if not bool(data.get("face_visible")):
