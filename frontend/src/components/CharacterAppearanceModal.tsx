@@ -35,6 +35,7 @@ import {
   type OutfitSetVersionCatalog,
 } from '../api';
 import type { PresetAssetSelection } from '../stores/presetAssetStore';
+import { mergeTags } from '../promptDocument';
 import ClothingPresetsModal from './ClothingPresetsModal';
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -96,6 +97,17 @@ function resultFromApply(data: CharacterAppearancePresetApplyResult): CharacterA
   };
 }
 
+export function characterPresetPromptForCopy(
+  data: CharacterAppearancePresetApplyResult,
+): string {
+  const outfit = data.default_outfit_set
+    ? data.default_outfit_set.prompt
+      ? [data.default_outfit_set.prompt]
+      : []
+    : data.clothing;
+  return mergeTags(data.appearance, outfit, data.expression).join(', ');
+}
+
 export default function CharacterAppearanceModal({
   open,
   onClose,
@@ -122,6 +134,7 @@ export default function CharacterAppearanceModal({
   const [enabledFilter, setEnabledFilter] = useState('');
   const [presetLoading, setPresetLoading] = useState(false);
   const [applyingId, setApplyingId] = useState('');
+  const [copyingId, setCopyingId] = useState('');
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<CharacterAppearancePreset | null>(null);
@@ -360,6 +373,28 @@ export default function CharacterAppearanceModal({
       message.error(detail || '应用预设失败');
     } finally {
       setApplyingId('');
+    }
+  };
+
+  const handleCopyPrompt = async (item: CharacterAppearancePreset) => {
+    setCopyingId(item.preset_id);
+    try {
+      const { data } = await api.post<CharacterAppearancePresetApplyResult>(
+        `/prompt-agent/appearance-presets/${encodeURIComponent(item.preset_id)}/apply`,
+        { version: item.version },
+      );
+      const prompt = characterPresetPromptForCopy(data).trim();
+      if (!prompt) {
+        message.warning('该角色预设没有可复制的提示词');
+        return;
+      }
+      await navigator.clipboard.writeText(prompt);
+      message.success('角色提示词已复制');
+    } catch (error: unknown) {
+      const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      message.error(detail || '复制提示词失败');
+    } finally {
+      setCopyingId('');
     }
   };
 
@@ -653,6 +688,15 @@ export default function CharacterAppearanceModal({
                 >
                   应用
                 </Button>
+                <Button
+                  size="small"
+                  icon={<CopyOutlined />}
+                  aria-label="复制提示词"
+                  loading={copyingId === item.preset_id}
+                  onClick={() => void handleCopyPrompt(item)}
+                >
+                  复制提示词
+                </Button>
                 {onManageThumbnail ? (
                   <Tooltip title={item.thumbnail_stale ? '管理缩略图；当前缩略图已过期' : '管理缩略图'}>
                     <Button
@@ -673,7 +717,7 @@ export default function CharacterAppearanceModal({
                 <Tooltip title="编辑；内置模板会复制为用户预设">
                   <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(item)} />
                 </Tooltip>
-                <Tooltip title="复制">
+                <Tooltip title="复制副本">
                   <Button size="small" icon={<CopyOutlined />} onClick={() => void handleDuplicate(item)} />
                 </Tooltip>
                 <Switch
