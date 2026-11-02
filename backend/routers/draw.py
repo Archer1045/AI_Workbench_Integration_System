@@ -1922,11 +1922,6 @@ def draw_batch(payload: dict = Body(...)):
         raise HTTPException(status_code=400, detail=f"总张数最多 {MAX_TOTAL_COUNT} 张")
     _validate_lora_compatibility(payload.get("loras") or [])
 
-    other_tasks = [task for task in task_state.running_tasks() if task["type"] != "draw"]
-    if other_tasks:
-        labels = "、".join(task["label"] for task in other_tasks)
-        raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
-
     settings = _parse_draw_settings(payload, model)
     generation_config = {
         "negative_prompt": fallback_negative,
@@ -1941,6 +1936,8 @@ def draw_batch(payload: dict = Body(...)):
     with ACTIVE_BATCH_LOCK:
         if ACTIVE_BATCH_ID and BATCH_JOBS.get(ACTIVE_BATCH_ID, {}).get("status") == "running":
             raise HTTPException(status_code=409, detail="已有绘画任务在运行，请等待完成或先停止")
+    task_registry.register("draw", job_id, total=total, resources=task_resources.for_kind("draw"))
+    with ACTIVE_BATCH_LOCK:
         ACTIVE_BATCH_ID = job_id
     BATCH_JOBS[job_id] = {
         "batch_id": job_id,
@@ -1954,7 +1951,6 @@ def draw_batch(payload: dict = Body(...)):
         "finished_at": None,
         "stop_requested": False,
     }
-    task_registry.register("draw", job_id, total=total, resources=task_resources.for_kind("draw"))
     _persist_job(BATCH_JOBS[job_id])
     threading.Thread(target=_run_batch, args=(job_id, groups, generation_config), daemon=True).start()
     return {"batch_id": job_id, "total": total, "status": "running"}
@@ -2028,29 +2024,30 @@ def draw(payload: dict = Body(...)):
         str(payload.get("negative_prompt") or ""),
     )
     _validate_lora_compatibility(payload.get("loras") or [])
-    other_tasks = [task for task in task_state.running_tasks() if task["type"] != "draw"]
-    if other_tasks:
-        labels = "、".join(task["label"] for task in other_tasks)
-        raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
     settings = _parse_draw_settings(payload, model)
-    result = _generate_and_record(
-        prompt,
-        negative_prompt,
-        settings["width"],
-        settings["height"],
-        settings["steps"],
-        settings["cfg"],
-        model,
-        payload.get("loras") or [],
-        payload.get("seed"),
-        None,
-        0,
-        0,
-        settings["lora_strength_model"],
-        settings["lora_strength_clip"],
-        settings["lora_strengths"],
-        prompt_document_json=prompt_document_json,
-    )
+    with task_registry.resource_scope(
+        "draw",
+        task_resources.for_kind("draw"),
+        payload={"mode": "single"},
+    ):
+        result = _generate_and_record(
+            prompt,
+            negative_prompt,
+            settings["width"],
+            settings["height"],
+            settings["steps"],
+            settings["cfg"],
+            model,
+            payload.get("loras") or [],
+            payload.get("seed"),
+            None,
+            0,
+            0,
+            settings["lora_strength_model"],
+            settings["lora_strength_clip"],
+            settings["lora_strengths"],
+            prompt_document_json=prompt_document_json,
+        )
     return result
 
 
@@ -2502,10 +2499,6 @@ def create_inpaint_job(payload: dict = Body(...)):
 
     mask = _decode_inpaint_mask(payload.get("mask_base64"), width, height)
     lora_strengths = _parse_lora_strengths(payload.get("lora_strengths"))
-    other_tasks = [task for task in task_state.running_tasks() if task["type"] != "draw"]
-    if other_tasks:
-        labels = "、".join(task["label"] for task in other_tasks)
-        raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
     job_id = f"inp_{uuid.uuid4().hex}"
     INPAINT_MASK_DIR.mkdir(parents=True, exist_ok=True)
     mask_path = INPAINT_MASK_DIR / f"{job_id}_mask.png"

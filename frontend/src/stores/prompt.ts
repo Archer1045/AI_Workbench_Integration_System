@@ -1,7 +1,6 @@
 // 提示词 Agent 状态
 import useStore from 'resso';
 import { api, type PromptAgentResult } from '../api';
-import { busyBlockMessage, showBusyWarning } from './busy';
 import { createDrawGroup, drawStore, runDraw } from './draw';
 import { uiStore } from './ui';
 
@@ -77,15 +76,6 @@ export async function fromImage(): Promise<void> {
     promptStore.status = '请先选择图片';
     return;
   }
-  // wd14 只跑本地 CPU 分类器（毫秒级、不占显存），不需要等待其他任务空闲。
-  if (promptStore.reverseMode !== 'wd14') {
-    const block = await busyBlockMessage();
-    if (block) {
-      promptStore.status = block;
-      showBusyWarning(block);
-      return;
-    }
-  }
   promptStore.status = '正在识别图片...';
   promptStore.result = null;
   try {
@@ -107,12 +97,6 @@ export async function fromText(): Promise<void> {
   const text = promptStore.text.trim();
   if (!text) {
     promptStore.status = '请先输入描述';
-    return;
-  }
-  const block = await busyBlockMessage();
-  if (block) {
-    promptStore.status = block;
-    showBusyWarning(block);
     return;
   }
   promptStore.status = '正在生成提示词...';

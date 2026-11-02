@@ -36,6 +36,7 @@ def _patch_inpaint_paths(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(draw_router, "INPAINT_MASK_DIR", tmp_path / "masks")
     monkeypatch.setattr(draw_router, "AI_PRODUCT_DIR", tmp_path / "AIproduct")
     monkeypatch.setattr(config, "COMFY_INPUT_DIR", tmp_path / "comfy_input")
+    monkeypatch.setattr(draw_router, "translate_text", lambda text: text)
 
 
 def test_inpaint_source_upload_and_preview(client, tmp_path, monkeypatch) -> None:

@@ -304,20 +304,28 @@ def _supervisor_once() -> None:
     settings = supervision_settings()
     if not settings["auto_restart"]:
         return
-    busy = False
+    blocked = {"ollama": True, "comfyui": True}
     try:
-        from task_state import running_tasks
+        import task_resources
 
-        busy = bool(running_tasks())
+        resources = {
+            str(item.get("key") or ""): bool(item.get("busy"))
+            for item in task_resources.snapshot().get("resources") or []
+        }
+        blocked = {
+            "ollama": resources.get("ollama", False),
+            "comfyui": resources.get("comfyui", False)
+            or resources.get("gpu", False),
+        }
     except Exception:
-        busy = False
+        pass
     checks = (("ollama", is_ollama_up()), ("comfyui", is_comfyui_up()))
     for name, up in checks:
         if up:
             _consecutive[name] = 0
             continue
         _consecutive[name] = _consecutive.get(name, 0) + 1
-        if busy or name in _restarting:
+        if blocked.get(name, True) or name in _restarting:
             continue
         if _consecutive[name] < settings["max_failures"]:
             continue

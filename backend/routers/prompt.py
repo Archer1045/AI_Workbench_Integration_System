@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import requests
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 import action_composer
 import database
@@ -34,7 +34,8 @@ import prompt_document
 import prompt_profiles
 import scene_presets
 import tag_category
-import task_state
+import task_registry
+import task_resources
 import toy_presets
 import water_presets
 from routers.chat import translate_text
@@ -124,16 +125,22 @@ SEMANTIC_SYSTEM = (
 )
 
 
-def _ensure_llm_resource_free() -> None:
-    """重任务运行时直接阻止提示词/LLM 类同步操作（不做排队）。"""
-    tasks = task_state.running_tasks()
-    if not tasks:
-        return
-    labels = "、".join(task["label"] for task in tasks)
-    raise HTTPException(
-        status_code=409,
-        detail=f"检测到资源占用（{labels}），绘画/训练运行期间已直接阻止提示词与 LLM 类操作，请等待任务结束再试",
-    )
+def _prompt_llm_lease():
+    with task_registry.resource_scope(
+        "prompt_llm",
+        task_resources.for_kind("prompt_llm"),
+    ):
+        yield
+
+
+def _prompt_image_lease(payload: dict = Body(...)):
+    mode = str(payload.get("mode") or "vlm").strip().lower()
+    kind = "prompt_wd14" if mode == "wd14" else "prompt_vlm"
+    with task_registry.resource_scope(
+        kind,
+        task_resources.for_kind(kind),
+    ):
+        yield
 
 
 def _llm_http_error(exc: Exception, operation: str) -> HTTPException:
@@ -172,7 +179,10 @@ def parse_semantic_items(text: str) -> list[dict]:
 
 
 @router.post("/api/prompt/validate")
-def validate_prompt(payload: dict = Body(...)):
+def validate_prompt(
+    payload: dict = Body(...),
+    _lease: None = Depends(_prompt_llm_lease),
+):
     """校验绘画提示词：重复、冲突、语法与人数一致性。"""
     prompt = str(payload.get("prompt") or "").strip()
     if not prompt:
@@ -297,7 +307,6 @@ def from_text(payload: dict = Body(...)):
         raise HTTPException(status_code=403, detail="该内容被禁止生成")
     if content_restriction_enabled() and content_filter.is_nsfw(text):
         raise HTTPException(status_code=403, detail="内容限制已开启，已阻止该请求")
-    _ensure_llm_resource_free()
     started_at = database.now_iso()
     started_ts = time.time()
     try:
@@ -320,7 +329,10 @@ def from_text(payload: dict = Body(...)):
 
 
 @router.post("/api/prompt/from-image")
-def from_image(payload: dict = Body(...)):
+def from_image(
+    payload: dict = Body(...),
+    _lease: None = Depends(_prompt_image_lease),
+):
     """图片反推提示词：保存原图、识别描述、生成英文提示词，并记录行为。"""
     data = str(payload.get("image_base64") or "")
     filename = str(payload.get("filename") or "image.png")
@@ -357,7 +369,6 @@ def from_image(payload: dict = Body(...)):
     else:
         if not prompt_agent.is_available():
             raise HTTPException(status_code=503, detail="Ollama 未启动")
-        _ensure_llm_resource_free()
 
     # 上传图片保存到 prompt_inputs，方便后续追溯
     prompt_inputs = AI_PRODUCT_DIR / "prompt_inputs"
@@ -397,7 +408,10 @@ def from_image(payload: dict = Body(...)):
 
 
 @router.post("/api/prompt-agent/split")
-def split_prompt_set(payload: dict = Body(...)):
+def split_prompt_set(
+    payload: dict = Body(...),
+    _lease: None = Depends(_prompt_llm_lease),
+):
     """把提示词集智能拆分为人物/动作/背景/画风/其他。"""
     text = str(payload.get("text") or "").strip()
     if not text:
@@ -405,7 +419,6 @@ def split_prompt_set(payload: dict = Body(...)):
     tags = [tag.strip() for tag in re.split(r"[,\n]", text) if tag.strip()]
     if not tags:
         raise HTTPException(status_code=400, detail="没有可拆分的标签")
-    _ensure_llm_resource_free()
     if bool(payload.get("role_aware")) and payload.get("description"):
         try:
             groups = prompt_agent.split_prompt_role_aware(str(payload.get("description")), tags)
@@ -1646,6 +1659,7 @@ def import_character_cache(payload: dict = Body(...)) -> dict:
 def character_appearance(
     character_name: str = Query(..., min_length=1, max_length=80),
     work: str = Query("", max_length=200),
+    _lease: None = Depends(_prompt_llm_lease),
 ) -> dict:
     """角色名+作品 -> 外貌/默认服装：先查本地缓存，未命中再用本地 LLM 草稿。"""
     name = character_name.strip()
@@ -1660,7 +1674,6 @@ def character_appearance(
     if cached:
         cached["source"] = "cache"
         return cached
-    _ensure_llm_resource_free()
     if not prompt_agent.is_available():
         raise HTTPException(status_code=503, detail="Ollama 未启动")
     try:
@@ -1779,14 +1792,16 @@ def prompt_profiles_api() -> dict:
 
 
 @router.post("/api/prompt-agent/refine")
-def refine_prompt(payload: dict = Body(...)):
+def refine_prompt(
+    payload: dict = Body(...),
+    _lease: None = Depends(_prompt_llm_lease),
+):
     """单轮细化：结合图片描述、现有提示词、预设体位与用户要求重新生成并拆分。"""
     description = str(payload.get("description") or "").strip()
     current_prompt = str(payload.get("prompt") or "").strip()
     requirements = str(payload.get("requirements") or "").strip()
     if not current_prompt:
         raise HTTPException(status_code=400, detail="prompt 不能为空")
-    _ensure_llm_resource_free()
     prompt_profile = str(
         payload.get("prompt_profile") or prompt_profiles.DEFAULT_PROFILE_ID
     ).strip()
@@ -1841,13 +1856,15 @@ def _cleanup_clarify_sessions() -> None:
 
 
 @router.post("/api/prompt-agent/clarify")
-def clarify_prompt(payload: dict = Body(...)):
+def clarify_prompt(
+    payload: dict = Body(...),
+    _lease: None = Depends(_prompt_llm_lease),
+):
     """多轮对话澄清：按 session 保留上下文，信息足够时返回最终提示词。"""
     session_id = str(payload.get("session_id") or "").strip() or uuid.uuid4().hex
     message = str(payload.get("message") or "").strip()
     if not message:
         raise HTTPException(status_code=400, detail="message 不能为空")
-    _ensure_llm_resource_free()
     with CLARIFY_LOCK:
         _cleanup_clarify_sessions()
         session = CLARIFY_SESSIONS.setdefault(session_id, {"history": [], "updated_at": time.time()})

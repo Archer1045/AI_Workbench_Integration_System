@@ -628,6 +628,11 @@ def test_group_pose_presets_have_explicit_people_pose_action_and_composition() -
         assert _expected_count(prompt) in (3, 4), preset_id
         assert "separate " in prompt, preset_id
         assert "wide shot" in prompt, preset_id
+        if preset_id.startswith("threesome_mmf_") and preset_id.endswith("_r18"):
+            assert "one adult woman" in prompt, preset_id
+            assert "two adult men" in prompt, preset_id
+            assert "contact points" in prompt, preset_id
+            continue
         assert any(
             marker in prompt
             for marker in (

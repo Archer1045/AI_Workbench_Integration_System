@@ -15,7 +15,6 @@ import {
   summarizeCompanion,
   switchCompanionPersona,
 } from '../stores/companion';
-import { busyBlockMessage, showBusyWarning } from '../stores/busy';
 import { api, type CompanionPersona } from '../api';
 
 const IDENTITY_OPTIONS = [
@@ -145,11 +144,6 @@ export default function CompanionPanel() {
 
   const handleSend = async () => {
     if (!input.trim() && !pendingImage) return;
-    const block = await busyBlockMessage();
-    if (block) {
-      showBusyWarning(block);
-      return;
-    }
     void sendCompanionMessage(input, pendingImage || undefined);
     setInput('');
     setPendingImage('');

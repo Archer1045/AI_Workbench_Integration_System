@@ -3299,12 +3299,15 @@ for _adult_pose in pose_presets_r18_20261102.POSE_PRESET_DEFINITIONS:
                 rating="R18",
                 intensity="强化",
                 draw_prompt=(
-                    "exactly 3 separate adult anime characters, one adult woman "
-                    "and two adult men, in one continuous scene; "
+                    "exactly 3 people, 3 separate bodies, all adult anime "
+                    "characters, one adult woman and two adult men, in one "
+                    "continuous scene; "
                     + _adult_pose["action_prompt"]
                     + "; three complete bodies, exactly one head, two arms and "
-                    "two legs per character, clear separate silhouettes, "
-                    "uncensored stylized anatomy, no extra people, no fused bodies"
+                    "two legs per character, wide shot, clear separate silhouettes, "
+                    "clear contact points, uncensored stylized anatomy, "
+                    "no extra people, no missing people, no merged bodies, "
+                    "no fused bodies"
                 ),
             )
         )

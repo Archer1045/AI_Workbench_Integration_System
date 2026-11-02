@@ -5,6 +5,7 @@ import app  # noqa: F401
 import comfy_worker
 import prompt_agent
 import task_registry
+import task_resources
 from routers import draw as draw_module
 from routers import prompt as prompt_module
 
@@ -66,15 +67,29 @@ def test_role_split_rescues_appearance_from_wrong_style_group():
     assert style["items"] == ["masterpiece"]
 
 
-def test_prompt_llm_endpoints_block_while_draw_running(client):
-    task_registry.register("draw", "draw-busy-prompt-1")
+def test_prompt_resources_are_scoped_instead_of_global_busy(client):
+    task_registry.register(
+        "draw",
+        "draw-busy-prompt-1",
+        resources=task_resources.for_kind("draw"),
+    )
     try:
-        response = client.post(
+        text_response = client.post(
             "/api/prompt-agent/split",
             json={"text": "1girl, masterpiece"},
         )
-        assert response.status_code == 409
-        assert "AI 绘画" in response.json()["detail"]
+        assert text_response.status_code == 200
+
+        image_response = client.post(
+            "/api/prompt/from-image",
+            json={
+                "image_base64": "iVBORw0KGgo=",
+                "filename": "tiny.png",
+                "mode": "vlm",
+            },
+        )
+        assert image_response.status_code == 409
+        assert "资源冲突" in image_response.json()["detail"]
     finally:
         task_registry.finish("draw", "draw-busy-prompt-1", "done")
 

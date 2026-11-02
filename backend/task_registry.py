@@ -1,8 +1,10 @@
 """统一后台任务注册表：任务创建、状态流转、资源租约与 SQLite 持久化。"""
 from __future__ import annotations
 
+from contextlib import contextmanager
 import threading
 import time
+import uuid
 
 import database
 import task_activity
@@ -179,6 +181,25 @@ def finish(kind: str, job_id: str, status: str, error: str | None = None) -> dic
         except Exception:
             pass
     return result
+
+
+@contextmanager
+def resource_scope(
+    kind: str,
+    resources: list[dict | str] | None = None,
+    *,
+    payload: dict | None = None,
+):
+    """Run one synchronous operation under the same lease lifecycle as a task."""
+    job_id = f"{kind}_{uuid.uuid4().hex}"
+    register(kind, job_id, payload=payload, resources=resources)
+    try:
+        yield job_id
+    except BaseException as exc:
+        finish(kind, job_id, "error", str(exc)[-1000:])
+        raise
+    else:
+        finish(kind, job_id, "done")
 
 
 def get(kind: str, job_id: str) -> dict | None:

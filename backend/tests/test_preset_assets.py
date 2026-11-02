@@ -18,6 +18,7 @@ import preset_asset_pipeline as pipeline
 import preset_asset_service as service
 import preset_registry
 import task_registry
+import task_resources
 from routers import preset_assets as preset_assets_router
 
 
@@ -239,8 +240,8 @@ def test_prompt_snapshot_layers_and_seed_strategies(workshop, monkeypatch):
     positive = snapshot["prompt_positive"]
     negative = snapshot["prompt_negative"]
     assert positive.index("style layer") < positive.index(str(preset["tags"][0]))
-    assert positive.index(str(preset["tags"][0])) < positive.index("clear pose reference")
-    assert positive.index("clear pose reference") < positive.index("user layer")
+    assert positive.index(str(preset["tags"][0])) < positive.index("clear single-character reference")
+    assert positive.index("clear single-character reference") < positive.index("user layer")
     assert negative.index("style negative") < negative.index("text, watermark")
     assert negative.index("text, watermark") < negative.index("extra characters")
     assert negative.index("extra characters") < negative.index("user negative")
@@ -851,7 +852,7 @@ def test_character_presets_register_with_workshop_metadata_and_latest_version(wo
     )
 
     definition = preset_registry.PRESET_KIND_BY_KEY["character"]
-    assert definition.order == 4
+    assert definition.order == 6
     assert definition.label == "角色"
     assert definition.composition_enabled is False
     assert definition.supports_thumbnail is True
@@ -2579,13 +2580,13 @@ def test_ai_job_waits_for_external_gpu_and_finishes_with_mock(
 ):
     preset = _preset("pose", restricted=False)
     preset_id = str(preset["id"])
-    release = threading.Event()
     generated_calls: list[dict] = []
+    monkeypatch.setattr(config, "PRESET_ASSET_SEMANTIC_VALIDATION", "off")
 
-    monkeypatch.setattr(
-        task_registry,
-        "running_tasks",
-        lambda: [] if release.is_set() else [{"type": "draw", "job_id": "draw-busy"}],
+    task_registry.register(
+        "draw",
+        "draw-busy",
+        resources=task_resources.for_kind("draw"),
     )
 
     def fake_generate(**kwargs):
@@ -2618,10 +2619,18 @@ def test_ai_job_waits_for_external_gpu_and_finishes_with_mock(
         candidates = database.list_preset_asset_candidates_by_job(job["job_id"])
         return str(candidates[0]["status"]) if candidates else ""
 
-    _wait_until(lambda: candidate_status() == "queued")
-    assert generated_calls == []
-    release.set()
-    _wait_until(lambda: pipeline.job_status(job["job_id"])["status"] == "done")
+    try:
+        _wait_until(lambda: candidate_status() == "queued")
+        assert generated_calls == []
+        task_registry.finish("draw", "draw-busy", "done")
+        _wait_until(
+            lambda: pipeline.job_status(job["job_id"])["status"]
+            in task_registry.TERMINAL_STATUSES
+        )
+        final_job = pipeline.job_status(job["job_id"])
+        assert final_job["status"] == "done", final_job
+    finally:
+        task_registry.finish("draw", "draw-busy", "done")
     candidate = database.list_preset_asset_candidates_by_job(job["job_id"])[0]
     assert candidate["status"] == "ready"
     assert candidate["seed"] == 55
@@ -2827,7 +2836,7 @@ def test_attempts_and_retry_backoff_are_recorded(workshop, monkeypatch):
     preset_id = str(_preset("pose", restricted=False)["id"])
     monkeypatch.setattr(pipeline, "_start_job_thread", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(pipeline, "_wait_for_gpu_slot", lambda *_args: True)
-    monkeypatch.setattr(pipeline, "_release_gpu_slot", lambda: None)
+    monkeypatch.setattr(pipeline, "_release_gpu_slot", lambda *_args: None)
 
     def fail_generation(**_kwargs):
         raise TimeoutError("generation timed out")
@@ -3243,6 +3252,32 @@ def test_restore_pending_jobs_resumes_queued_and_cleans_interrupted_running(
         {"mode": "ai", "candidate_count": 1},
     )
 
+    preparing_job_id = "restore-preparing"
+    database.save_background_job(
+        {
+            "job_id": preparing_job_id,
+            "kind": pipeline.JOB_KIND,
+            "status": "preparing",
+            "total": 1,
+            "done": 0,
+            "current": "",
+            "error": None,
+            "stop_requested": False,
+            "payload": {},
+            "created_at": timestamp,
+            "updated_at": timestamp,
+            "finished_at": None,
+        }
+    )
+    database.insert_preset_asset_job_item(
+        preparing_job_id,
+        0,
+        "pose",
+        preset_id,
+        "preparing",
+        {"mode": "ai", "candidate_count": 1},
+    )
+
     interrupted_job_id = "restore-running"
     database.save_background_job(
         {
@@ -3278,12 +3313,17 @@ def test_restore_pending_jobs_resumes_queued_and_cleans_interrupted_running(
     )
 
     task_registry.restore_interrupted()
-    assert pipeline.restore_pending_jobs() >= 2
+    assert pipeline.restore_pending_jobs() >= 3
 
     queued_item = database.list_preset_asset_job_items(queued_job_id)[0]
     assert queued_item["status"] == "queued"
     assert task_registry.get(pipeline.JOB_KIND, queued_job_id)["status"] == "queued"
     assert (queued_job_id, {0}) in started
+
+    preparing_item = database.list_preset_asset_job_items(preparing_job_id)[0]
+    assert preparing_item["status"] == "queued"
+    assert task_registry.get(pipeline.JOB_KIND, preparing_job_id)["status"] == "queued"
+    assert (preparing_job_id, {0}) in started
 
     interrupted_item = database.list_preset_asset_job_items(
         interrupted_job_id

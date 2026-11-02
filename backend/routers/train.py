@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+from contextlib import nullcontext
 import json
 import os
 import re
@@ -326,52 +327,56 @@ def replace_dataset_tags(payload: dict = Body(...)) -> dict:
     else:
         targets = _caption_files()
 
-    if not dry_run:
-        busy_tasks = task_state.running_tasks()
-        if busy_tasks:
-            labels = "、".join(task["label"] for task in busy_tasks)
-            raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
+    scope = (
+        task_registry.resource_scope(
+            "dataset_write",
+            task_resources.for_kind("dataset_write"),
+            payload={"from_tag": from_tag, "to_tag": to_tag},
+        )
+        if not dry_run
+        else nullcontext()
+    )
+    with scope:
+        backup_dir: Path | None = None
+        if not dry_run:
+            backup_dir = TAG_BACKUP_DIR / f"{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
-    backup_dir: Path | None = None
-    if not dry_run:
-        backup_dir = TAG_BACKUP_DIR / f"{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-
-    changed: list[dict] = []
-    affected_tags = 0
-    for path in targets:
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        tags = [tag.strip() for tag in text.split(",") if tag.strip()]
-        replaced = [to_tag if tag == from_tag else tag for tag in tags]
-        replaced_count = sum(1 for old, new in zip(tags, replaced) if old != new)
-        if replaced_count == 0:
-            continue
-        # 替换可能产生重复标签，去重并保持首次出现顺序。
-        seen_tags: set[str] = set()
-        unique: list[str] = []
-        for tag in replaced:
-            if not tag or tag in seen_tags:
+        changed: list[dict] = []
+        affected_tags = 0
+        for path in targets:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            tags = [tag.strip() for tag in text.split(",") if tag.strip()]
+            replaced = [to_tag if tag == from_tag else tag for tag in tags]
+            replaced_count = sum(1 for old, new in zip(tags, replaced) if old != new)
+            if replaced_count == 0:
                 continue
-            seen_tags.add(tag)
-            unique.append(tag)
-        if not dry_run and backup_dir is not None:
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path, backup_dir / path.name)
-            path.write_text(", ".join(unique), encoding="utf-8")
-        changed.append({"name": path.name, "count": replaced_count})
-        affected_tags += replaced_count
+            # 替换可能产生重复标签，去重并保持首次出现顺序。
+            seen_tags: set[str] = set()
+            unique: list[str] = []
+            for tag in replaced:
+                if not tag or tag in seen_tags:
+                    continue
+                seen_tags.add(tag)
+                unique.append(tag)
+            if not dry_run and backup_dir is not None:
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, backup_dir / path.name)
+                path.write_text(", ".join(unique), encoding="utf-8")
+            changed.append({"name": path.name, "count": replaced_count})
+            affected_tags += replaced_count
 
-    return {
-        "ok": True,
-        "dry_run": dry_run,
-        "total_files": len(targets),
-        "affected_files": len(changed),
-        "affected_tags": affected_tags,
-        "files": changed,
-        "backup_dir": str(backup_dir) if backup_dir and not dry_run else None,
-    }
+        return {
+            "ok": True,
+            "dry_run": dry_run,
+            "total_files": len(targets),
+            "affected_files": len(changed),
+            "affected_tags": affected_tags,
+            "files": changed,
+            "backup_dir": str(backup_dir) if backup_dir and not dry_run else None,
+        }
 
 
 @router.get("/api/train/dataset-check")
@@ -1143,10 +1148,6 @@ def start_training(payload: dict = Body(...)) -> dict:
     with TRAIN_LOCK:
         if any(job["status"] == "running" for job in TRAIN_JOBS.values()):
             raise HTTPException(status_code=409, detail="已有训练任务在运行")
-    other_tasks = [task for task in task_state.running_tasks() if task["type"] != "train"]
-    if other_tasks:
-        labels = "、".join(task["label"] for task in other_tasks)
-        raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
     manual_confirmed = bool(payload.get("manual_confirmed", False))
     if AI_IMPORT_MARKER.exists():
         try:
@@ -1355,35 +1356,13 @@ def start_training(payload: dict = Body(...)) -> dict:
     # 初始化失败（WinError 1114）而让主进程永久等待。0 worker 在当前数据量下
     # 速度几乎无损失（实测约 3.5s/step），稳定性优先。
     cmd += ["--max_data_loader_n_workers", "0"]
-    _write_train_sidecar(
-        job_id,
-        cmd=cmd,
-        output_name=output_name,
-        auto_convert=bool(payload.get("auto_convert", False)),
-        cwd=str(TRAIN_SCRIPT.parent),
-    )
-
-    env = os.environ.copy()
-    env.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-    env.setdefault("PYTHONIOENCODING", "utf-8")
-    # Windows 版 xformers 没有 triton，显式关闭可避免每个子进程都打印一次导入堆栈。
-    env.setdefault("XFORMERS_FORCE_DISABLE_TRITON", "1")
-    with open(log_path, "w", encoding="utf-8") as log_file:
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(TRAIN_SCRIPT.parent),
-            env=env,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-    TRAIN_JOBS[job_id] = {
+    job = {
         "job_id": job_id,
         "output_name": output_name,
         "overwrite_output": overwrite_output,
         "status": "running",
         "log_path": str(log_path),
-        "process": proc,
+        "process": None,
         "error": None,
         "cancelled": False,
         "auto_convert": bool(payload.get("auto_convert", False)),
@@ -1434,8 +1413,39 @@ def start_training(payload: dict = Body(...)) -> dict:
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "finished_at": None,
     }
-    database.save_train_job(TRAIN_JOBS[job_id])
     task_registry.register("train", job_id, resources=task_resources.for_kind("train"))
+    try:
+        _write_train_sidecar(
+            job_id,
+            cmd=cmd,
+            output_name=output_name,
+            auto_convert=bool(payload.get("auto_convert", False)),
+            cwd=str(TRAIN_SCRIPT.parent),
+        )
+        env = os.environ.copy()
+        env.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+        env.setdefault("PYTHONIOENCODING", "utf-8")
+        # Windows 版 xformers 没有 triton，显式关闭可避免每个子进程都打印一次导入堆栈。
+        env.setdefault("XFORMERS_FORCE_DISABLE_TRITON", "1")
+        with open(log_path, "w", encoding="utf-8") as log_file:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(TRAIN_SCRIPT.parent),
+                env=env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        job["process"] = proc
+        TRAIN_JOBS[job_id] = job
+        database.save_train_job(job)
+    except Exception as exc:
+        proc = job.get("process")
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+        TRAIN_JOBS.pop(job_id, None)
+        task_registry.finish("train", job_id, "error", f"训练启动失败：{exc}")
+        raise HTTPException(status_code=500, detail=f"训练启动失败：{exc}") from exc
     threading.Thread(
         target=_watch_train_process,
         args=(job_id,),
@@ -1526,20 +1536,21 @@ def resume_training(job_id: str) -> dict:
     new_cmd = _resume_command(list(sidecar.get("cmd") or []), state)
     if len(new_cmd) < 2:
         raise HTTPException(status_code=400, detail="续训命令为空")
-    _write_train_sidecar(
-        new_id,
-        cmd=new_cmd,
-        output_name=output_name,
-        auto_convert=bool(sidecar.get("auto_convert", False)),
-        cwd=str(sidecar.get("cwd") or TRAIN_SCRIPT.parent),
-        resumed_from=str(state),
-        steps_offset=steps_offset,
-    )
-    env = os.environ.copy()
-    env.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-    env.setdefault("PYTHONIOENCODING", "utf-8")
-    env.setdefault("XFORMERS_FORCE_DISABLE_TRITON", "1")
+    task_registry.register("train", new_id, resources=task_resources.for_kind("train"))
     try:
+        _write_train_sidecar(
+            new_id,
+            cmd=new_cmd,
+            output_name=output_name,
+            auto_convert=bool(sidecar.get("auto_convert", False)),
+            cwd=str(sidecar.get("cwd") or TRAIN_SCRIPT.parent),
+            resumed_from=str(state),
+            steps_offset=steps_offset,
+        )
+        env = os.environ.copy()
+        env.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+        env.setdefault("PYTHONIOENCODING", "utf-8")
+        env.setdefault("XFORMERS_FORCE_DISABLE_TRITON", "1")
         with open(log_path, "w", encoding="utf-8") as log_file:
             proc = subprocess.Popen(
                 new_cmd,
@@ -1549,7 +1560,8 @@ def resume_training(job_id: str) -> dict:
                 stderr=subprocess.STDOUT,
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
-    except OSError as exc:
+    except Exception as exc:
+        task_registry.finish("train", new_id, "error", f"续训进程启动失败：{exc}")
         raise HTTPException(status_code=500, detail=f"续训进程启动失败：{exc}") from exc
 
     new_job = {
@@ -1572,12 +1584,6 @@ def resume_training(job_id: str) -> dict:
         "steps_offset": steps_offset,
     }
     TRAIN_JOBS[new_id] = new_job
-    try:
-        task_registry.register("train", new_id, resources=task_resources.for_kind("train"))
-    except Exception as exc:
-        proc.kill()
-        TRAIN_JOBS.pop(new_id, None)
-        raise HTTPException(status_code=409, detail=f"续训资源冲突：{exc}") from exc
     database.save_train_job(new_job)
     threading.Thread(
         target=_watch_train_process,
@@ -2136,10 +2142,6 @@ def start_compare_generate(payload: dict = Body(...)) -> dict:
                 "clip": config.DRAW_DEFAULT_LORA_STRENGTH_CLIP,
             },
         )
-    other_tasks = [task for task in task_state.running_tasks() if task["type"] != "compare"]
-    if other_tasks:
-        labels = "、".join(task["label"] for task in other_tasks)
-        raise HTTPException(status_code=409, detail=f"有其他项目正在运行（{labels}），请稍后再进行")
     with COMPARE_LOCK:
         if any(job["status"] == "running" for job in COMPARE_JOBS.values()):
             raise HTTPException(status_code=409, detail="已有对比出图任务在运行")

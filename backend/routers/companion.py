@@ -20,7 +20,8 @@ import content_filter
 import database
 import llm
 import prompt_agent
-import task_state
+import task_registry
+import task_resources
 from web_tools import WebToolsError, get_web_tools_service
 
 router = APIRouter()
@@ -546,17 +547,31 @@ def companion_chat(payload: dict = Body(...)):
     if not persona or not session:
         return JSONResponse(status_code=404, content={"error": "人设或会话不存在"})
 
-    running = task_state.running_tasks()
-    if running:
-        labels = "、".join(task["label"] for task in running)
+    task_kind = "companion_vision" if image_base64 else "companion_text"
+    job_id = uuid.uuid4().hex
+    try:
+        task_registry.register(
+            task_kind,
+            job_id,
+            payload={"session_id": session_id, "persona_id": persona_id},
+            resources=task_resources.for_kind(task_kind),
+        )
+    except task_resources.ResourceConflictError as exc:
         return JSONResponse(
             status_code=409,
-            content={"error": f"有其他项目正在运行（{labels}），请稍后再进行", "tasks": running},
+            content={
+                "error": task_resources.conflict_message(exc),
+                "resources": task_resources.snapshot(),
+            },
         )
+
+    def stop_with_error(status_code: int, error: str) -> JSONResponse:
+        task_registry.finish(task_kind, job_id, "error", error)
+        return JSONResponse(status_code=status_code, content={"error": error})
 
     settings = _settings()
     if settings.get("content_restriction") == "1" and content_filter.is_nsfw(message):
-        return JSONResponse(status_code=403, content={"error": "内容限制已开启，已阻止该请求"})
+        return stop_with_error(403, "内容限制已开启，已阻止该请求")
 
     image_path = ""
     image_description = ""
@@ -564,20 +579,20 @@ def companion_chat(payload: dict = Body(...)):
         try:
             image_path = _save_companion_image(image_base64)
         except ValueError as exc:
-            return JSONResponse(status_code=400, content={"error": str(exc)})
+            return stop_with_error(400, str(exc))
         if not prompt_agent.is_available():
-            return JSONResponse(status_code=503, content={"error": "Ollama 未运行，无法识别图片"})
+            return stop_with_error(503, "Ollama 未运行，无法识别图片")
         image_description, _describe_error = _describe_companion_image(image_path)
         if image_description:
             combined = f"{message} {image_description}".strip()
             if content_filter.is_always_blocked(combined):
-                return JSONResponse(status_code=403, content={"error": "图片包含受限内容，已阻止该请求"})
+                return stop_with_error(403, "图片包含受限内容，已阻止该请求")
             if settings.get("content_restriction") == "1" and content_filter.is_nsfw(combined):
-                return JSONResponse(status_code=403, content={"error": "内容限制已开启，已阻止该图片请求"})
+                return stop_with_error(403, "内容限制已开启，已阻止该图片请求")
         elif settings.get("content_restriction") == "1":
-            return JSONResponse(
-                status_code=403,
-                content={"error": "图片识别失败，可能包含受限内容；已阻止该请求"},
+            return stop_with_error(
+                403,
+                "图片识别失败，可能包含受限内容；已阻止该请求",
             )
 
     user_text = message or "[图片]"
@@ -705,4 +720,18 @@ def companion_chat(payload: dict = Body(...)):
         )
         database.insert_companion_message(session_id, persona_id, "assistant", full)
 
-    return StreamingResponse(generate(), media_type="text/event-stream")
+    def tracked_generate():
+        final_status = "done"
+        try:
+            yield from generate()
+        except GeneratorExit:
+            final_status = "interrupted"
+            raise
+        except Exception as exc:
+            final_status = "error"
+            task_registry.finish(task_kind, job_id, final_status, str(exc)[-1000:])
+            raise
+        finally:
+            task_registry.finish(task_kind, job_id, final_status)
+
+    return StreamingResponse(tracked_generate(), media_type="text/event-stream")

@@ -1,6 +1,10 @@
 """统一任务资源租约与活动事件测试。"""
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 import database
@@ -134,3 +138,155 @@ def test_expired_claim_can_be_taken_over(tmp_path, monkeypatch):
     assert any(item["job_id"] == "takeover-1" for item in active)
     assert not any(item["job_id"] == "expired-1" for item in active)
     task_resources.release_resources("takeover-1")
+
+
+def test_resource_scope_releases_after_success_and_error(tmp_path, monkeypatch):
+    _init(tmp_path, monkeypatch)
+    with task_registry.resource_scope(
+        "dataset_write",
+        task_resources.for_kind("dataset_write"),
+    ) as job_id:
+        claims = task_resources.list_job_claims(job_id)
+        assert {item["resource_key"] for item in claims} == {"dataset"}
+    assert task_resources.list_job_claims(job_id) == []
+
+    with pytest.raises(RuntimeError, match="synthetic failure"):
+        with task_registry.resource_scope(
+            "dataset_write",
+            task_resources.for_kind("dataset_write"),
+        ) as failed_job_id:
+            raise RuntimeError("synthetic failure")
+    assert task_resources.list_job_claims(failed_job_id) == []
+
+
+def test_dataset_write_can_run_with_draw_but_training_claims_dataset(tmp_path, monkeypatch):
+    _init(tmp_path, monkeypatch)
+    task_registry.register(
+        "draw",
+        "draw-independent-dataset",
+        resources=task_resources.for_kind("draw"),
+    )
+    task_registry.register(
+        "dataset_write",
+        "dataset-write-independent",
+        resources=task_resources.for_kind("dataset_write"),
+    )
+    assert {item["type"] for item in task_registry.running_tasks()} == {
+        "draw",
+        "dataset_write",
+    }
+    with pytest.raises(task_resources.ResourceConflictError):
+        task_registry.register(
+            "train",
+            "train-waits-dataset",
+            resources=task_resources.for_kind("train"),
+        )
+    task_registry.finish("dataset_write", "dataset-write-independent", "done")
+    with pytest.raises(task_resources.ResourceConflictError):
+        task_registry.register(
+            "train",
+            "train-waits-draw",
+            resources=task_resources.for_kind("train"),
+        )
+    task_registry.finish("draw", "draw-independent-dataset", "done")
+    task_registry.register(
+        "train",
+        "train-after-dataset",
+        resources=task_resources.for_kind("train"),
+    )
+    task_registry.finish("train", "train-after-dataset", "done")
+
+
+def test_companion_text_can_run_with_draw_but_vision_waits_for_gpu(
+    tmp_path,
+    monkeypatch,
+):
+    _init(tmp_path, monkeypatch)
+    task_registry.register(
+        "draw",
+        "draw-companion-peer",
+        resources=task_resources.for_kind("draw"),
+    )
+    task_registry.register(
+        "companion_text",
+        "companion-text-peer",
+        resources=task_resources.for_kind("companion_text"),
+    )
+    with pytest.raises(task_resources.ResourceConflictError):
+        task_registry.register(
+            "companion_vision",
+            "companion-vision-waits",
+            resources=task_resources.for_kind("companion_vision"),
+        )
+    task_registry.finish("companion_text", "companion-text-peer", "done")
+    task_registry.finish("draw", "draw-companion-peer", "done")
+    task_registry.register(
+        "companion_vision",
+        "companion-vision-after-draw",
+        resources=task_resources.for_kind("companion_vision"),
+    )
+    task_registry.finish("companion_vision", "companion-vision-after-draw", "done")
+
+
+def test_repeated_claim_from_same_job_does_not_conflict_with_itself(
+    tmp_path,
+    monkeypatch,
+):
+    _init(tmp_path, monkeypatch)
+    first = task_resources.claim_resources(
+        "duplicate-job",
+        "draw",
+        task_resources.for_kind("draw"),
+    )
+    second = task_resources.claim_resources(
+        "duplicate-job",
+        "draw",
+        task_resources.for_kind("draw"),
+    )
+    assert len(first) == len(second) == 2
+    assert len(database.list_active_task_resource_claims()) == 2
+    task_resources.release_resources("duplicate-job")
+
+
+def test_resource_claims_are_atomic_across_processes(tmp_path, monkeypatch):
+    db_path = tmp_path / "multi_process_resources.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+    database.init_db()
+    script = """
+import sys
+from pathlib import Path
+
+import database
+database.DB_PATH = Path(sys.argv[1])
+
+import task_resources
+
+try:
+    task_resources.claim_resources(
+        sys.argv[2],
+        "draw",
+        task_resources.for_kind("draw"),
+        ttl_seconds=60,
+    )
+except task_resources.ResourceConflictError:
+    print("conflict")
+else:
+    print("acquired")
+"""
+    project_backend = str(Path(__file__).resolve().parent.parent)
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-c", script, str(db_path), f"process-{index}"],
+            cwd=project_backend,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for index in range(2)
+    ]
+    results = []
+    for process in processes:
+        stdout, stderr = process.communicate(timeout=30)
+        assert process.returncode == 0, stderr
+        results.append(stdout.strip())
+    assert sorted(results) == ["acquired", "conflict"]

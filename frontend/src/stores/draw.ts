@@ -14,7 +14,6 @@ import {
   type PromptDocumentV1,
   type PromptValidation,
 } from '../api';
-import { busyBlockMessage, showBusyWarning } from './busy';
 import { batchElapsedSeconds } from '../drawTiming';
 import { getRuntimeConfig } from './runtimeConfig';
 import { uiStore } from './ui';
@@ -629,11 +628,6 @@ export async function runDraw(): Promise<void> {
     message.warning(`总张数最多 ${config.max_total_count} 张，请先减少各组张数`);
     return;
   }
-  const block = await busyBlockMessage();
-  if (block) {
-    showBusyWarning(block);
-    return;
-  }
   if (!(await validatePrompts())) return;
   const groups: DrawGroupInput[] = drawStore.groups
     .filter((group) => group.enabled !== false && groupHasPrompt(group))
@@ -699,11 +693,6 @@ export async function regenerateCurrent(seed?: number): Promise<void> {
     drawStore.steps > config.steps_max
   ) {
     message.warning(`请填写步数（${config.steps_min}-${config.steps_max}）`);
-    return;
-  }
-  const block = await busyBlockMessage();
-  if (block) {
-    showBusyWarning(block);
     return;
   }
   if (!(await validatePrompts())) return;

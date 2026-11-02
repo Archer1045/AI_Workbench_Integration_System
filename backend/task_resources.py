@@ -17,12 +17,35 @@ RESOURCE_DEFINITIONS = {
     "vlm": {"label": "本地 VLM", "mode": "exclusive", "description": "本地视觉模型"},
     "emulator": {"label": "模拟器", "mode": "exclusive", "description": "游戏模拟器实例"},
     "adb": {"label": "ADB", "mode": "exclusive", "description": "ADB 设备控制通道"},
+    "dataset": {
+        "label": "训练数据集",
+        "mode": "exclusive",
+        "description": "训练集图片与标签读写资源",
+    },
 }
 
 TASK_RESOURCE_POLICIES = {
     "draw": (("gpu", "exclusive"), ("comfyui", "exclusive")),
-    "train": (("gpu", "exclusive"),),
-    "caption": (("gpu", "exclusive"), ("ollama", "shared")),
+    "train": (("gpu", "exclusive"), ("dataset", "exclusive")),
+    "caption": (
+        ("gpu", "exclusive"),
+        ("dataset", "exclusive"),
+        ("ollama", "shared"),
+    ),
+    "dataset_write": (("dataset", "exclusive"),),
+    "prompt_llm": (("ollama", "shared"),),
+    "prompt_vlm": (
+        ("gpu", "exclusive"),
+        ("ollama", "shared"),
+        ("vlm", "exclusive"),
+    ),
+    "prompt_wd14": (("gpu", "exclusive"),),
+    "companion_text": (("ollama", "shared"),),
+    "companion_vision": (
+        ("gpu", "exclusive"),
+        ("ollama", "shared"),
+        ("vlm", "exclusive"),
+    ),
     "compare": (("gpu", "exclusive"), ("comfyui", "exclusive")),
     "review": (("gpu", "exclusive"), ("ollama", "shared"), ("vlm", "exclusive")),
     "merge": (),

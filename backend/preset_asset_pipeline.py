@@ -1761,6 +1761,18 @@ def restore_pending_jobs() -> int:
             and item.get("status") in PENDING_ITEM_STATUSES
         }
         if pending_indexes:
+            for item in refreshed_items:
+                item_index = int(item["item_index"])
+                if (
+                    item_index in pending_indexes
+                    and item.get("status") == "preparing"
+                ):
+                    database.update_preset_asset_job_item(
+                        job_id,
+                        item_index,
+                        status="queued",
+                        error=None,
+                    )
             task_registry.update(
                 JOB_KIND,
                 job_id,
@@ -1965,17 +1977,7 @@ def _process_ai_item(
                         error="已取消",
                     )
                     raise PresetAssetCancelled()
-                try:
-                    task_registry.update(
-                        JOB_KIND,
-                        job_id,
-                        status="running",
-                        current=f"{item['preset_type']}/{item['preset_id']}",
-                    )
-                    break
-                except task_resources.ResourceConflictError:
-                    _release_gpu_slot()
-                    time.sleep(0.5)
+                break
             gpu_acquired = True
             database.update_preset_asset_candidate(
                 candidate_id,
@@ -2076,7 +2078,7 @@ def _process_ai_item(
             raise
         finally:
             if gpu_acquired:
-                _release_gpu_slot()
+                _release_gpu_slot(job_id)
     return generated, "done"
 
 
@@ -2132,19 +2134,25 @@ def _wait_for_gpu_slot(job_id: str, candidate_id: int) -> bool:
         if _job_cancelled(job_id):
             return False
         with _GPU_CONDITION:
-            external = [
-                task
-                for task in task_registry.running_tasks()
-                if task.get("type") != JOB_KIND
-            ]
-            if not external and not _AI_ACTIVE:
+            if _AI_ACTIVE:
+                reason = "等待前一个预设生成任务"
+            else:
+                reason = ""
                 _AI_ACTIVE = True
+        if not reason:
+            try:
+                task_registry.update(
+                    JOB_KIND,
+                    job_id,
+                    status="running",
+                    current="已获取 GPU/ComfyUI",
+                )
                 return True
-        reason = (
-            "等待其他重任务释放 GPU"
-            if external
-            else "等待前一个预设生成任务"
-        )
+            except task_resources.ResourceConflictError as exc:
+                reason = task_resources.conflict_message(exc)
+                with _GPU_CONDITION:
+                    _AI_ACTIVE = False
+                    _GPU_CONDITION.notify_all()
         task_registry.update(JOB_KIND, job_id, status="queued", current=reason)
         database.update_preset_asset_candidate(
             candidate_id,
@@ -2154,10 +2162,19 @@ def _wait_for_gpu_slot(job_id: str, candidate_id: int) -> bool:
         time.sleep(1)
 
 
-def _release_gpu_slot() -> None:
+def _release_gpu_slot(job_id: str) -> None:
     global _AI_ACTIVE
     with _GPU_CONDITION:
         _AI_ACTIVE = False
+        try:
+            task_registry.update(
+                JOB_KIND,
+                job_id,
+                status="queued",
+                current="等待下一候选或任务项",
+            )
+        except Exception:
+            pass
         _GPU_CONDITION.notify_all()
 
 

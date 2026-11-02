@@ -13,7 +13,6 @@ import {
   saveCaptionTask,
 } from '../captionTaskState';
 import { drawStore } from '../stores/draw';
-import { busyBlockMessage, showBusyWarning } from '../stores/busy';
 import { getRuntimeConfig } from '../stores/runtimeConfig';
 import {
   loadTrainCompareState,
@@ -1101,11 +1100,6 @@ export default function TrainPanel() {
     }
     if (!overwriteOutputRef.current && nameConflicts.length > 0) {
       setNameConflictOpen(true);
-      return;
-    }
-    const block = await busyBlockMessage();
-    if (block) {
-      showBusyWarning(block);
       return;
     }
     await runStartTraining(false, overwriteOutputRef.current);

@@ -13,7 +13,6 @@ import {
   type PromptValidationIssue,
   type ScenePreset,
 } from '../api';
-import { busyBlockMessage, showBusyWarning } from '../stores/busy';
 import { promptStore, fromImage, fromText, sendToDraw, setReverseOptions } from '../stores/prompt';
 import { settingsStore } from '../stores/settings';
 import { CLOTHING_SCOPE_OPTIONS, formatClothingInsert, type ClothingScope } from '../clothingPresets';
@@ -185,11 +184,6 @@ export default function PromptAgent() {
       message.warning('请输入提示词集');
       return;
     }
-    const block = await busyBlockMessage();
-    if (block) {
-      showBusyWarning(block);
-      return;
-    }
     setSplitLoading(true);
     try {
       const { data } = await api.post<{ groups: SplitGroups }>('/prompt-agent/split', { text: splitText });
@@ -255,11 +249,6 @@ export default function PromptAgent() {
       message.warning('请先生成提示词');
       return;
     }
-    const block = await busyBlockMessage();
-    if (block) {
-      showBusyWarning(block);
-      return;
-    }
     setRefining(true);
     try {
       const selectedPose = posePresets.find((item) => item.id === selectedPoseId);
@@ -295,11 +284,6 @@ export default function PromptAgent() {
   const handleRoleSplit = async () => {
     if (!result?.prompt) {
       message.warning('请先生成提示词');
-      return;
-    }
-    const block = await busyBlockMessage();
-    if (block) {
-      showBusyWarning(block);
       return;
     }
     setRefining(true);
@@ -426,11 +410,6 @@ export default function PromptAgent() {
   const sendClarify = async () => {
     const messageText = clarifyInput.trim();
     if (!messageText || clarifyLoading) return;
-    const block = await busyBlockMessage();
-    if (block) {
-      showBusyWarning(block);
-      return;
-    }
     setClarifyMessages((prev) => [...prev, { role: 'user', content: messageText }]);
     setClarifyInput('');
     setClarifyLoading(true);
