@@ -14,6 +14,7 @@ import content_filter
 import database
 import llm
 import pose_presets_20261102
+import pose_presets_duo_r18_20261102_b
 import pose_presets_r18_20261102
 import prompt_profiles
 import requests
@@ -3311,6 +3312,23 @@ for _adult_pose in pose_presets_r18_20261102.POSE_PRESET_DEFINITIONS:
                 ),
             )
         )
+
+for _duo_sex_pose in pose_presets_duo_r18_20261102_b.POSE_PRESET_DEFINITIONS:
+    POSE_PRESETS.append(
+        _duo_r18_pose(
+            _duo_sex_pose["id"],
+            _duo_sex_pose["category"],
+            _duo_sex_pose["label"],
+            _duo_sex_pose["translation"],
+            list(_duo_sex_pose["tags"]),
+            orientation=_duo_sex_pose["orientation"],
+            role_slots=list(_duo_sex_pose["role_slots"]),
+            contact_points=list(_duo_sex_pose["contact_points"]),
+            action_prompt=_duo_sex_pose["action_prompt"],
+            camera=_duo_sex_pose["camera"],
+            intensity="强化",
+        )
+    )
 
 SOLO_R18_POSE_IDS = tuple(
     str(item["id"])

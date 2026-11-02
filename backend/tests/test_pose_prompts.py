@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pose_prompts
 import pose_presets_20261102
+import pose_presets_duo_r18_20261102_b
 import pose_presets_r18_20261102
 import prompt_agent
 
@@ -81,7 +82,7 @@ def test_daily_pose_batch_adds_21_unique_non_previewed_presets():
     assert len(ids) == len(set(ids))
 
     by_id = {item["id"]: item for item in prompt_agent.POSE_PRESETS}
-    assert len(prompt_agent.POSE_PRESETS) == 489
+    assert len(prompt_agent.POSE_PRESETS) == 509
     assert set(ids) <= set(by_id)
     for preset_id in ids:
         preset = by_id[preset_id]
@@ -127,7 +128,7 @@ def test_adult_pose_batch_adds_22_non_mirror_presets():
     assert "镜子" not in serialized
 
     by_id = {item["id"]: item for item in prompt_agent.POSE_PRESETS}
-    assert len(prompt_agent.POSE_PRESETS) == 489
+    assert len(prompt_agent.POSE_PRESETS) == 509
     assert len(prompt_agent.SOLO_R18_POSE_IDS) == 138
     assert set(ids) <= set(by_id)
     for preset_id in ids:
@@ -141,6 +142,61 @@ def test_adult_pose_batch_adds_22_non_mirror_presets():
             assert preset["people"] == "多人"
             assert preset["people_count"] == 3
             assert preset["role_slots"] == ["女A", "男A", "男B"]
+
+
+def test_duo_sex_pose_batch_adds_20_adult_in_progress_presets(client):
+    definitions = pose_presets_duo_r18_20261102_b.POSE_PRESET_DEFINITIONS
+    ids = [item["id"] for item in definitions]
+    assert len(definitions) == 20
+    assert len(ids) == len(set(ids))
+    assert sum(item["orientation"] == "男女" for item in definitions) == 16
+    assert sum(item["orientation"] == "女女" for item in definitions) == 4
+
+    by_id = {item["id"]: item for item in prompt_agent.POSE_PRESETS}
+    assert len(by_id) == len(prompt_agent.POSE_PRESETS) == 509
+    assert set(ids) <= set(by_id)
+    for definition in definitions:
+        preset = by_id[definition["id"]]
+        assert preset["rating"] == "R18"
+        assert preset["people"] == "双人"
+        assert preset["people_count"] == 2
+        assert len(preset["role_slots"]) == 2
+        assert preset["orientation"] == definition["orientation"]
+        assert preset["contact_points"] == definition["contact_points"]
+        assert preset["image"] is None
+        assert preset["has_image"] is False
+        assert "sex in progress" in " ".join(preset["tags"]).lower()
+        assert "consent" in " ".join(preset["tags"]).lower()
+        assert preset["draw_prompt"]
+        public_text = " ".join(
+            [
+                str(definition["id"]),
+                str(definition["label"]),
+                *map(str, definition["tags"]),
+            ]
+        ).lower()
+        assert "mirror" not in public_text
+        assert "镜子" not in public_text
+
+    response = client.get("/api/prompt-agent/pose-presets")
+    assert response.status_code == 200
+    assert response.json()["total"] == 509
+    api_by_id = {item["id"]: item for item in response.json()["items"]}
+    assert api_by_id["duo_bathtub_edge_rear_embrace_r18"]["people_count"] == 2
+
+    composed = client.post(
+        "/api/prompt-agent/compose-presets",
+        json={
+            "pose_id": "lesbian_futon_scissors_r18",
+            "role_order": ["女性角色A", "女性角色B"],
+        },
+    )
+    assert composed.status_code == 200
+    prompt = composed.json()["prompt"]
+    assert "exactly two people" in prompt
+    assert "two separate bodies" in prompt
+    assert "lesbian sex in progress" in prompt
+    assert "futon" in prompt
 
 
 def test_two_men_one_woman_pose_is_composable(client):

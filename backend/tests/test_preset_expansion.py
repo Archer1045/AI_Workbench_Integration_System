@@ -168,10 +168,10 @@ def test_multi_pose_people_count_and_role_slots_are_consistent() -> None:
         for item in prompt_agent.POSE_PRESETS
         if item.get("people") in {"双人", "多人"}
     ]
-    assert len(multi_poses) == 319
-    assert sum(item["people"] == "双人" for item in multi_poses) == 291
+    assert len(multi_poses) == 339
+    assert sum(item["people"] == "双人" for item in multi_poses) == 311
     assert sum(item["people"] == "多人" for item in multi_poses) == 28
-    assert sum(len(item["role_slots"]) == 2 for item in multi_poses) == 291
+    assert sum(len(item["role_slots"]) == 2 for item in multi_poses) == 311
     assert sum(len(item["role_slots"]) == 3 for item in multi_poses) == 22
     assert sum(len(item["role_slots"]) == 4 for item in multi_poses) == 6
     number_words = {
@@ -561,7 +561,7 @@ def test_body_modification_api_and_restriction(client, monkeypatch) -> None:
 def test_preset_catalog_counts_and_restriction(client, monkeypatch) -> None:
     catalog = client.get("/api/prompt-agent/preset-catalog").json()
     assert catalog["restricted"] is False
-    assert len(catalog["poses"]) == 489
+    assert len(catalog["poses"]) == 509
     assert len(catalog["clothing"]) == 1123
     assert len(catalog["scenes"]) == 252
     assert len(catalog["body_modifications"]) == 27
@@ -860,8 +860,8 @@ def test_new_intimate_and_pain_play_expansion_is_complete() -> None:
     by_id = {item["id"]: item for item in prompt_agent.POSE_PRESETS}
     assert expected_duo_ids <= set(by_id)
     assert set(expected_new_pain_tags) <= set(by_id)
-    assert len(prompt_agent.POSE_PRESETS) == 489
-    assert len({item["id"] for item in prompt_agent.POSE_PRESETS}) == 489
+    assert len(prompt_agent.POSE_PRESETS) == 509
+    assert len({item["id"] for item in prompt_agent.POSE_PRESETS}) == 509
 
     for preset_id in expected_duo_ids:
         item = by_id[preset_id]
