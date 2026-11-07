@@ -4,8 +4,10 @@ import sys
 
 import uvicorn
 
-HOST = "127.0.0.1"
-PORT = 8500
+import config
+
+HOST = config.BACKEND_HOST
+PORT = config.BACKEND_PORT
 
 
 def port_in_use(port: int) -> bool:
