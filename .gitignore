@@ -26,3 +26,7 @@ Thumbs.db
 frontend/public/
 frontend/workshop-actual.png
 $null
+
+# 临时备份文件
+*.bak-*
+

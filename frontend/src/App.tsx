@@ -1,5 +1,5 @@
 // 工作台主布局：服务状态栏 + 四个工作区
-import { Button, Layout, Space, Switch, Tabs, Tag, Tooltip } from "antd";
+import { Button, Layout, Menu, Space, Switch, Tabs, Tag, Tooltip } from "antd";
 import { lazy, Suspense, useEffect } from "react";
 import AutoShutdownBanner from "./components/AutoShutdownBanner";
 import GpuMonitor from "./components/GpuMonitor";
@@ -17,9 +17,11 @@ import {
   toggleRestriction,
 } from "./stores/settings";
 import { uiStore, type TabKey } from "./stores/ui";
+import { NAV_GROUPS } from "./navigation";
 
 const AIDrawingWorkspace = lazy(() => import("./components/AIDrawingWorkspace"));
 const GameAssistantPanel = lazy(() => import("./components/GameAssistantPanel"));
+const McPanel = lazy(() => import("./components/McPanel"));
 const VideoPanel = lazy(() => import("./components/VideoPanel"));
 const TrainPanel = lazy(() => import("./components/TrainPanel"));
 const PromptAgent = lazy(() => import("./components/PromptAgent"));
@@ -34,19 +36,29 @@ function PanelFallback() {
   return <div className="tab-loading">加载中...</div>;
 }
 
-const tabItems = [
-  { key: "draw", label: "AI 绘画", children: <Suspense fallback={<PanelFallback />}><AIDrawingWorkspace /></Suspense> },
-  { key: "gameAssistant", label: "游戏助手", children: <Suspense fallback={<PanelFallback />}><GameAssistantPanel /></Suspense> },
-  { key: "video", label: "AI 动画", children: <Suspense fallback={<PanelFallback />}><VideoPanel /></Suspense> },
-  { key: "train", label: "LoRA 训练", children: <Suspense fallback={<PanelFallback />}><TrainPanel /></Suspense> },
-  { key: "prompt", label: "提示词 Agent", children: <Suspense fallback={<PanelFallback />}><PromptAgent /></Suspense> },
-  { key: "presetLibrary", label: "预设库", children: <Suspense fallback={<PanelFallback />}><PresetLibraryPanel /></Suspense> },
-  { key: "presetAssets", label: "预设工坊", children: <Suspense fallback={<PanelFallback />}><PresetAssetWorkshopPanel /></Suspense> },
-  { key: "records", label: "数据看板", children: <Suspense fallback={<PanelFallback />}><RecordsPanel /></Suspense> },
-  { key: "companion", label: "情感陪伴", children: <Suspense fallback={<PanelFallback />}><CompanionPanel /></Suspense> },
-  { key: "agent", label: "招聘 Agent", children: <Suspense fallback={<PanelFallback />}><AgentChat /></Suspense> },
-  { key: "settings", label: "全局设置", children: <Suspense fallback={<PanelFallback />}><SettingsPanel /></Suspense> },
-];
+// 面板与 TabKey 的映射：导航结构由 navigation.ts 决定，这里只负责渲染
+const PANELS: Record<TabKey, { label: string; render: () => JSX.Element }> = {
+  draw: { label: "AI 绘画", render: () => <AIDrawingWorkspace /> },
+  gameAssistant: { label: "游戏助手", render: () => <GameAssistantPanel /> },
+  mcAssistant: { label: "我的世界", render: () => <McPanel /> },
+  video: { label: "AI 动画", render: () => <VideoPanel /> },
+  train: { label: "LoRA 训练", render: () => <TrainPanel /> },
+  prompt: { label: "提示词 Agent", render: () => <PromptAgent /> },
+  presetLibrary: { label: "预设库", render: () => <PresetLibraryPanel /> },
+  presetAssets: { label: "预设工坊", render: () => <PresetAssetWorkshopPanel /> },
+  records: { label: "数据看板", render: () => <RecordsPanel /> },
+  companion: { label: "情感陪伴", render: () => <CompanionPanel /> },
+  agent: { label: "招聘 Agent", render: () => <AgentChat /> },
+  settings: { label: "全局设置", render: () => <SettingsPanel /> },
+};
+
+const tabItems = NAV_GROUPS.flatMap((group) =>
+  group.items.map((item) => ({
+    key: item.key,
+    label: PANELS[item.key].label,
+    children: <Suspense fallback={<PanelFallback />}>{PANELS[item.key].render()}</Suspense>,
+  })),
+);
 
 export default function App() {
   const { ollama, comfyui, loading } = servicesStore;
@@ -68,11 +80,35 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // 顶部导航：分组菜单，选中项跟随 activeTab
+  const navItems = NAV_GROUPS.map((group) => {
+    if (group.items.length === 1) {
+      return { key: group.items[0].key, label: group.label };
+    }
+    return {
+      key: group.key,
+      label: group.label,
+      children: group.items.map((item) => ({ key: item.key, label: item.label })),
+    };
+  });
+
   return (
     <Layout className="app-layout">
       <Layout.Header className="app-header">
         <div className="brand">AI工作台</div>
-        <Space wrap>
+        <Menu
+          mode="horizontal"
+          selectedKeys={[uiStore.activeTab]}
+          items={navItems}
+          onClick={({ key }) => {
+            if (PANELS[key as TabKey]) {
+              uiStore.activeTab = key as TabKey;
+            }
+          }}
+          className="app-nav"
+          disabledOverflow
+        />
+        <Space wrap className="app-header-actions">
           <GpuMonitor />
           <TaskNotificationControl />
           <Tooltip title="全局内容限制：影响 AI 绘画、提示词 Agent 与情感陪伴；开启后拦截 NSFW 关键词，未成年相关内容始终拦截。">
@@ -115,6 +151,7 @@ export default function App() {
             uiStore.activeTab = key as TabKey;
           }}
           items={tabItems}
+          tabBarStyle={{ display: "none" }}
         />
       </Layout.Content>
     </Layout>

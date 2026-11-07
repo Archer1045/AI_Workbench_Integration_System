@@ -621,8 +621,14 @@ export default function DrawPanel({
       value: `${width}x${height}`,
     });
   }
+  // 模型预设的尺寸 + 后端 allowed_sizes 的额外尺寸，合并去重
+  // 原来二选一，导致 allowed_sizes 里新增的分辨率看不到
+  const presetValues = new Set(profileSizeOptions.map((item) => item.value));
+  const extraSizeOptions = sizeOptions.filter((item) => !presetValues.has(item.value));
   const resolvedSizeOptions =
-    profileSizeOptions.length > 0 ? profileSizeOptions : sizeOptions;
+    profileSizeOptions.length > 0
+      ? [...profileSizeOptions, ...extraSizeOptions]
+      : sizeOptions;
   const activeCanvasPreset = activeModelSpec
     ? selectedCanvasPreset(width, height, activeModelSpec)
     : null;
@@ -1794,6 +1800,13 @@ export default function DrawPanel({
 
   const drawingLoras = lorasList.filter((item) => item.compatible !== false);
 
+  // anima-turbo 由后端强制注入（缺少会画面发白、对比度低），
+  // 不当作可选项展示，避免用户取消后又被加回来产生困惑。
+  const TURBO_LORA_STEM = 'anima-turbo-lora-v0.2';
+  const selectableLoras = drawingLoras.filter(
+    (item) => !item.name.includes(TURBO_LORA_STEM),
+  );
+
   const handleSavePreset = () => {
     if (!presetName.trim()) {
       message.warning('请输入预设名称');
@@ -2704,25 +2717,6 @@ export default function DrawPanel({
         >
           服装套装
         </Button>
-        <Button block onClick={() => setClothingSetOpen(true)} style={{ marginBottom: 8 }}>
-          保存服装集
-        </Button>
-        <Button icon={<DeleteOutlined />} block onClick={handleClearPrompts} style={{ marginBottom: 8 }}>
-          清空提示词
-        </Button>
-        <Space style={{ width: '100%', marginBottom: 8 }}>
-          <Select
-            placeholder="应用参数预设"
-            style={{ flex: 1 }}
-            value={presetSelected || undefined}
-            options={presets.map((item) => ({ label: item.name, value: item.name }))}
-            onChange={handleApplyPreset}
-          />
-          <Button size="small" icon={<SaveOutlined />} onClick={() => setPresetModalOpen(true)}>
-            保存
-          </Button>
-          <Button size="small" danger icon={<DeleteOutlined />} disabled={!presetSelected} onClick={handleDeletePreset} />
-        </Space>
         <div className="group-list-heading">
           <label>提示词组</label>
           <Space size={4} wrap>
@@ -2973,6 +2967,33 @@ export default function DrawPanel({
       </div>
       <div className="result panel-box">
         <div className="status">{status}</div>
+        <div className="draw-command-bar">
+          <Select
+            size="small"
+            placeholder="应用参数预设"
+            style={{ minWidth: 160 }}
+            value={presetSelected || undefined}
+            options={presets.map((item) => ({ label: item.name, value: item.name }))}
+            onChange={handleApplyPreset}
+          />
+          <Button size="small" icon={<SaveOutlined />} onClick={() => setPresetModalOpen(true)}>
+            保存参数
+          </Button>
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={!presetSelected}
+            onClick={handleDeletePreset}
+          />
+          <span className="draw-command-bar-sep" />
+          <Button size="small" onClick={() => setClothingSetOpen(true)}>
+            保存服装集
+          </Button>
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={handleClearPrompts}>
+            清空提示词
+          </Button>
+        </div>
         <Segmented
           size="small"
           value={batchCompare ? 'compare' : 'single'}
@@ -3259,7 +3280,7 @@ export default function DrawPanel({
           onCfgChange={(value) => {
             drawStore.cfg = value;
           }}
-          loras={lorasList}
+          loras={selectableLoras}
           selectedLoras={loras}
           loraStrengths={loraStrengths}
           loraDefaults={{
