@@ -456,3 +456,148 @@ def _fallback_text(intent: str, data: dict) -> str:
         titles = "、".join(x["title"] for x in wiki[:3])
         return f"资料里没有直接对应的条目，但相关页面有：{titles}。可以换个更具体的名字再问。"
     return "资料里没有找到相关内容。可以试试更具体的物品名，比如「下界合金锭」而不是「下界合金」。"
+
+PLAN_SYSTEM_PROMPT = """你是「我的世界」攻略规划助手。根据用户的目标，生成一张 Mermaid 流程图。
+
+规则：
+1. 只输出 Mermaid 代码，不要任何解释、不要 Markdown 代码块标记。
+2. 使用 `graph LR` 或 `graph TD`。
+3. 节点文字用中文，简短（不超过 10 字）。
+4. 节点 id 用数字，如 A1、A2，避免特殊字符。
+5. 步骤控制在 6-12 个，符合真实游戏流程。
+6. 涉及具体物品时用中文名。
+
+示例输出：
+graph LR
+  A1[出生] --> A2[砍树]
+  A2 --> A3[木镐]
+  A3 --> A4[石镐]
+  A4 --> A5[铁矿]
+  A5 --> A6[铁镐]
+"""
+
+# 常见目标的兜底模板（LLM 不可用时使用）
+PLAN_TEMPLATES = {
+    "生存": """graph LR
+  A1[出生] --> A2[砍树]
+  A2 --> A3[工作台+木镐]
+  A3 --> A4[挖石头]
+  A4 --> A5[石镐石剑]
+  A5 --> A6[找铁矿]
+  A6 --> A7[烧铁]
+  A7 --> A8[铁镐铁甲]
+  A8 --> A9[挖钻石]
+  A9 --> A10[钻石装备]
+  A10 --> A11[去下界]
+  A11 --> A12[打烈焰人]
+  A12 --> A13[找要塞]
+  A13 --> A14[末地传送门]
+  A14 --> A15[击败末影龙]""",
+    "钻石": """graph LR
+  A1[准备铁镐] --> A2[挖到 Y=-59]
+  A2 --> A3[找钻石矿]
+  A3 --> A4[铁镐开挖]
+  A4 --> A5[钻石]
+  A5 --> A6[钻石装备]
+  A6 --> A7[做附魔台]
+  A7 --> A8[附魔]""",
+    "下界": """graph LR
+  A1[挖黑曜石] --> A2[做打火石]
+  A2 --> A3[搭传送门]
+  A3 --> A4[进入下界]
+  A4 --> A5[找堡垒遗迹]
+  A5 --> A6[打烈焰人]
+  A6 --> A7[拿烈焰棒]
+  A7 --> A8[合成烈焰粉]""",
+    "末影龙": """graph LR
+  A1[钻石装备] --> A2[进下界]
+  A2 --> A3[打烈焰人]
+  A3 --> A4[烈焰粉+末影珍珠]
+  A4 --> A5[合成末影之眼]
+  A5 --> A6[找到要塞]
+  A6 --> A7[激活末地门]
+  A7 --> A8[进末地]
+  A8 --> A9[炸水晶]
+  A9 --> A10[击败末影龙]""",
+    "附魔": """graph LR
+  A1[挖钻石] --> A2[做附魔台]
+  A2 --> A3[做书架]
+  A3 --> A4[摆满15个书架]
+  A4 --> A5[攒经验]
+  A5 --> A6[附魔装备]""",
+    "村民": """graph LR
+  A1[找村庄] --> A2[做床和工作台]
+  A2 --> A3[安置村民]
+  A3 --> A4[放讲台]
+  A4 --> A5[刷图书管理员]
+  A5 --> A6[换经验修补]""",
+    "刷怪": """graph LR
+  A1[选刷怪点] --> A2[挖刷怪塔]
+  A2 --> A3[做水流]
+  A3 --> A4[做掉落通道]
+  A4 --> A5[挂机刷经验]""",
+    "农业": """graph LR
+  A1[找水边] --> A2[锄地]
+  A2 --> A3[种小麦]
+  A3 --> A4[等成熟]
+  A4 --> A5[收割]
+  A5 --> A6[做面包]""",
+}
+
+
+def _pick_template(goal: str) -> str | None:
+    for key, tpl in PLAN_TEMPLATES.items():
+        if key in goal:
+            return tpl
+    return None
+
+
+
+def build_plan(goal: str) -> dict:
+    """根据目标生成 Mermaid 流程图。模板优先，未命中再走 LLM。"""
+    goal = (goal or "").strip()
+    if not goal:
+        return {"goal": "", "diagram": "", "source": "none", "text": "请说明你想规划什么目标。"}
+
+    # 优先匹配模板（秒出）
+    tpl = _pick_template(goal)
+    if tpl:
+        return {
+            "goal": goal,
+            "diagram": tpl,
+            "source": "template",
+            "text": f"已为「{goal}」生成规划图。",
+        }
+
+    # 模板没覆盖才走 LLM
+    if llm.is_available():
+        try:
+            messages = [
+                {"role": "system", "content": PLAN_SYSTEM_PROMPT},
+                {"role": "user", "content": f"目标：{goal}"},
+            ]
+            raw = llm.chat(
+                messages, temperature=0.4, max_tokens=400, timeout=180, think=False
+            )
+            raw = raw.strip()
+            raw = re.sub(r"^```(?:mermaid)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+            if "graph " in raw:
+                return {
+                    "goal": goal,
+                    "diagram": raw,
+                    "source": "llm",
+                    "text": f"已为「{goal}」生成规划图。",
+                }
+        except Exception as exc:
+            print(f"[mc_chat] 规划图 LLM 失败: {str(exc)[:100]}")
+
+    return {
+        "goal": goal,
+        "diagram": "",
+        "source": "none",
+        "text": (
+            f"暂时无法为「{goal}」生成规划图。"
+            "可以试试「生存路线」「钻石流程」「下界准备」「末影龙」「附魔」「村民」「刷怪」「农业」这些目标。"
+        ),
+    }

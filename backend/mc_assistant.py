@@ -326,3 +326,21 @@ def mc_chat_endpoint(request: ChatRequest) -> dict:
     if not q:
         raise HTTPException(status_code=400, detail="query 不能为空")
     return mc_chat.answer(q)
+
+@router.get("/api/mc/timeline")
+def mc_timeline() -> dict:
+    """返回主要更新时间线（Wiki 表格 + 手工补全 1.13~1.21）。"""
+    path = DATA_DIR / "timeline.json"
+    if not path.exists():
+        raise HTTPException(status_code=503, detail=f"时间线数据不存在: {path}")
+    items = json.loads(path.read_text(encoding="utf-8"))
+    return {"total": len(items), "updates": items}
+
+class PlanRequest(BaseModel):
+    goal: str
+
+
+@router.post("/api/mc/plan")
+def mc_plan(request: PlanRequest) -> dict:
+    """生成发育路线规划图（Mermaid）。"""
+    return mc_chat.build_plan(request.goal)

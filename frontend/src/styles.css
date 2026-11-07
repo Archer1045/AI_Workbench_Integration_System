@@ -7202,3 +7202,194 @@ body,
   object-fit: contain;
   image-rendering: pixelated;
 }
+
+/* ===== 版本时间线 ===== */
+.mc-timeline {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 4px 16px;
+}
+
+.mc-timeline-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #8a919f;
+  font-size: 13px;
+}
+
+.mc-timeline-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.mc-timeline-head h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  color: #1f2329;
+}
+
+.mc-timeline-head p {
+  margin: 0;
+  font-size: 12px;
+  color: #8a919f;
+}
+
+.mc-timeline-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-tl-item {
+  display: flex;
+  gap: 14px;
+}
+
+.mc-tl-axis {
+  flex: 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 18px;
+}
+
+.mc-tl-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c9d3e3;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #d6dee9;
+  flex: 0 0 auto;
+}
+
+.mc-tl-item.major .mc-tl-dot {
+  background: #e8573a;
+  box-shadow: 0 0 0 1px #f3b3a5;
+}
+
+.mc-tl-line {
+  flex: 1;
+  width: 2px;
+  background: #e6ebf2;
+  margin: 4px 0;
+}
+
+.mc-tl-card {
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #e8ebf0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.mc-tl-item.major .mc-tl-card {
+  border-color: #f4d3ca;
+  background: #fffdfc;
+}
+
+.mc-tl-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.mc-tl-date {
+  font-size: 11px;
+  color: #8a919f;
+}
+
+.mc-tl-count {
+  font-size: 11px;
+  color: #a3a9b5;
+}
+
+.mc-tl-name {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: #1f2329;
+}
+
+.mc-tl-highlights {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mc-tl-highlights li {
+  font-size: 12px;
+  color: #4a515e;
+  line-height: 1.5;
+}
+
+.mc-timeline-hint {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #a3a9b5;
+  text-align: center;
+}
+
+/* ===== 发育路线图 ===== */
+.mc-plan-tip {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #8a919f;
+  line-height: 1.6;
+}
+
+.mc-mermaid {
+  margin-top: 8px;
+  padding: 12px;
+  background: #fafbfc;
+  border: 1px solid #eef1f5;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.mc-mermaid svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.mc-mermaid-error {
+  font-size: 12px;
+  color: #d4380d;
+  text-align: center;
+  padding: 8px;
+}
+
+/* 流程图需要更宽的展示区 */
+.mc-msg.has-diagram .mc-body {
+  max-width: min(1100px, 94%);
+  width: min(1100px, 94%);
+}
+
+.mc-mermaid {
+  margin-top: 8px;
+  padding: 14px;
+  background: #fafbfc;
+  border: 1px solid #eef1f5;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.mc-mermaid svg {
+  display: block;
+  margin: 0 auto;
+  max-width: none;
+  min-width: 600px;
+  height: auto;
+}

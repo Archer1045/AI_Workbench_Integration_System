@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Input, Space, Spin, Tag, message } from 'antd';
+import { Button, Input, Modal, Space, Tag, message } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 import { api } from '../api';
+import McTimeline from './McTimeline';
+import MermaidDiagram from './MermaidDiagram';
 
 type RecipeRow = (string | null)[];
 
@@ -29,6 +31,7 @@ type Message = {
   recipes?: Recipe[];
   materialIcons?: Record<string, string>;
   diff?: { from: string; to: string; count: number; items: any[] };
+  diagram?: string;
   candidates?: {
     id: string;
     name_zh: string | null;
@@ -68,6 +71,9 @@ export default function McPanel() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [version, setVersion] = useState('1.21');
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [planGoal, setPlanGoal] = useState('');
+  const [planOpen, setPlanOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -138,6 +144,32 @@ export default function McPanel() {
     }
   };
 
+  const generatePlan = async () => {
+    const goal = planGoal.trim();
+    if (!goal || loading) return;
+    setPlanOpen(false);
+    setMessages((prev) => [...prev, { role: 'user', content: `规划：${goal}` }]);
+    setLoading(true);
+    try {
+      const r = await api.post('/mc/plan', { goal });
+      const d = r.data;
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: d.text || '已生成规划图。',
+          kind: 'text',
+          diagram: d.diagram || undefined,
+        },
+      ]);
+    } catch (err) {
+      message.error(`生成规划图失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
+      setPlanGoal('');
+    }
+  };
+
   const loadDiff = async () => {
     if (loading) return;
     setLoading(true);
@@ -171,6 +203,12 @@ export default function McPanel() {
         </div>
         <Space>
           <Tag color="green">当前 {version}</Tag>
+          <Button size="small" onClick={() => setPlanOpen(true)}>
+            发育路线
+          </Button>
+          <Button size="small" onClick={() => setShowTimeline(true)}>
+            版本时间线
+          </Button>
           <Button size="small" onClick={() => void loadDiff()}>
             版本跨度
           </Button>
@@ -180,6 +218,28 @@ export default function McPanel() {
         </Space>
       </div>
 
+      <Modal
+        title="生成发育路线"
+        open={planOpen}
+        onCancel={() => setPlanOpen(false)}
+        onOk={() => void generatePlan()}
+        okText="生成"
+        cancelText="取消"
+        width={480}
+      >
+        <p className="mc-plan-tip">说明你想规划的目标，例如「生存路线」「钻石流程」「下界准备」。</p>
+        <Input
+          value={planGoal}
+          onChange={(e) => setPlanGoal(e.target.value)}
+          onPressEnter={() => void generatePlan()}
+          placeholder="例如：从零到击败末影龙"
+        />
+      </Modal>
+
+      {showTimeline ? <McTimeline onBack={() => setShowTimeline(false)} /> : null}
+
+      {showTimeline ? null : (
+      <>
       <div className="mc-list" ref={listRef}>
         {messages.length === 0 ? (
           <div className="mc-empty">
@@ -195,7 +255,7 @@ export default function McPanel() {
         ) : null}
 
         {messages.map((item, index) => (
-          <div key={index} className={`mc-msg ${item.role}`}>
+          <div key={index} className={`mc-msg ${item.role} ${item.diagram ? 'has-diagram' : ''}`}>
             <div className="mc-avatar">{item.role === 'user' ? '你' : '麦'}</div>
             <div className="mc-body">
               <div className="mc-text">{item.content}</div>
@@ -270,6 +330,8 @@ export default function McPanel() {
                 </div>
               ) : null}
 
+              {item.diagram ? <MermaidDiagram code={item.diagram} /> : null}
+
               {item.diff ? (
                 <div className="mc-diff">
                   {item.diff.items.map((x: any) => (
@@ -308,6 +370,8 @@ export default function McPanel() {
       <div className="mc-hint">
         提示：图标来自 Minecraft Wiki，配方覆盖 1.7.10 ~ 1.21 六个版本
       </div>
+      </>
+      )}
     </div>
   );
 }
