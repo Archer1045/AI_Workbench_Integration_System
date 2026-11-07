@@ -291,6 +291,7 @@ export default function TrainPanel() {
   const trainConfig = runtimeConfig.train;
   const [initialCompareState] = useState<TrainComparePersistState | null>(loadTrainCompareState);
   const [info, setInfo] = useState<DatasetInfo | null>(null);
+  const [trainSection, setTrainSection] = useState('task');
   const [mode, setMode] = useState<'wd14' | 'qwen'>(savedTrainState.mode);
   const [language, setLanguage] = useState<'tags' | 'description'>(savedTrainState.language);
   const [skipExisting, setSkipExisting] = useState(savedTrainState.skipExisting);
@@ -1588,6 +1589,32 @@ export default function TrainPanel() {
 
   return (
     <div className="train-layout">
+      <aside className="train-side panel-box">
+        <h4>训练</h4>
+        {[
+          { key: 'task', label: '训练任务' },
+          { key: 'dataset', label: '数据集' },
+          { key: 'params', label: '参数预设' },
+          { key: 'history', label: '历史记录' },
+        ].map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`train-navbtn ${trainSection === item.key ? 'active' : ''}`}
+            onClick={() => setTrainSection(item.key)}
+          >
+            {item.label}
+          </button>
+        ))}
+        <h4 style={{ marginTop: 16 }}>已有 LoRA</h4>
+        {drawingLoras.slice(0, 8).map((item) => (
+          <div key={item.name} className="train-lora-item" title={item.name}>
+            {item.name.replace(/\.safetensors$/, '')}
+          </div>
+        ))}
+      </aside>
+
+      <div className="train-main">
       <div className="panel-box train-box">
         <div className="train-stats">
           <Tag>图片 {info?.image_count ?? 0}</Tag>
@@ -1745,6 +1772,28 @@ export default function TrainPanel() {
       </div>
 
       <div className="panel-box train-box">
+        <div className="train-stat-cards">
+          <div className="train-stat-card">
+            <span>当前 loss</span>
+            <b>{trainJob?.latest_loss != null ? Number(trainJob.latest_loss).toFixed(3) : '—'}</b>
+          </div>
+          <div className="train-stat-card">
+            <span>最佳 loss</span>
+            <b>{trainJob?.min_loss != null ? Number(trainJob.min_loss).toFixed(3) : '—'}</b>
+          </div>
+          <div className="train-stat-card">
+            <span>学习率</span>
+            <b style={{ fontSize: 16 }}>{learningRate || '—'}</b>
+          </div>
+          <div className="train-stat-card">
+            <span>步数</span>
+            <b style={{ fontSize: 16 }}>
+              {trainJob?.steps_done != null && trainJob?.steps_total != null
+                ? `${trainJob.steps_done}/${trainJob.steps_total}`
+                : '—'}
+            </b>
+          </div>
+        </div>
         <div className="train-section-title">训练配置</div>
         <div className="train-config">
           <div className="train-field">
@@ -2746,6 +2795,7 @@ export default function TrainPanel() {
           </div>
         ) : null}
       </Modal>
+      </div>
     </div>
   );
 }

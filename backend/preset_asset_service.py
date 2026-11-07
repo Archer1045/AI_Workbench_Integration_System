@@ -1589,7 +1589,13 @@ def finalize_ai_candidate(
         "focus_y": (crop or {}).get("focus_y", 0.5),
         "zoom": (crop or {}).get("zoom", 1.0),
     }
-    output_size = tuple(int(item) for item in target["output_size"])
+    candidate_width = int(candidate.get("output_width") or 0)
+    candidate_height = int(candidate.get("output_height") or 0)
+    if candidate_width > 0 and candidate_height > 0:
+        # 候选自身记录的输出尺寸优先，横躺体位会改用横幅
+        output_size = (candidate_width, candidate_height)
+    else:
+        output_size = tuple(int(item) for item in target["output_size"])
     crop_params = {
         "focus_x": crop_data["focus_x"],
         "focus_y": crop_data["focus_y"],

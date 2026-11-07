@@ -531,6 +531,34 @@ def _strip_prompt_fragments(value: str, fragments: tuple[str, ...]) -> str:
     return text.strip(" ,;")
 
 
+_HORIZONTAL_POSE_MARKERS = (
+    "lying",
+    "lie on",
+    "on back",
+    "on side",
+    "on stomach",
+    "prone",
+    "supine",
+    "sleeping",
+    "horizontal",
+    "reclin",
+    "横躺",
+    "仰卧",
+    "侧卧",
+    "俯卧",
+    "平躺",
+)
+
+
+def _pose_is_horizontal(preset: dict[str, Any]) -> bool:
+    """判断体位是否为横躺类，用于预览生成时切换横幅画布。"""
+    text = " ".join(
+        str(preset.get(key) or "")
+        for key in ("id", "name", "system", "category", "pose_name", "description", "tags")
+    ).lower()
+    return any(marker in text for marker in _HORIZONTAL_POSE_MARKERS)
+
+
 def resolve_thumbnail_framing(
     preset_type: str,
     preset: dict[str, Any],
@@ -552,7 +580,9 @@ def resolve_thumbnail_framing(
         return {"mode": "upper_body", "reason": "upper_garment_part"}
     if any(marker in text for marker in _UPPER_BODY_MARKERS):
         return {"mode": "upper_body", "reason": "upper_body_marker"}
-    return {"mode": "partial_body", "reason": "show_complete_featured_garment"}
+    # 2026-11-05：服装/套装默认改回全身取景。partial_body 会裁掉头部，
+    # 预览看不到整体搭配，反而降低可读性。
+    return {"mode": "full_body", "reason": "show_complete_featured_garment"}
 
 
 def resolve_thumbnail_scene(preset: dict[str, Any]) -> str:
@@ -1167,6 +1197,47 @@ def _dedupe_parts(parts: list[str]) -> list[str]:
     return result
 
 
+# CLIP 文本编码上限为 77 token。英文提示词按每 4 字符约 1 token 保守估算，
+# 用于在拼接前裁剪各层，避免超出部分被静默截断。
+CLIP_TOKEN_LIMIT = 77
+CHARS_PER_TOKEN = 4
+LAYER_BUDGET_TOKENS = {
+    "thumbnail": 25,
+    "generation": 12,
+    "type": 24,
+    "style": 8,
+}
+
+
+def _estimate_tokens(text: str) -> int:
+    value = str(text or "").strip()
+    if not value:
+        return 0
+    return -(-len(value) // CHARS_PER_TOKEN)
+
+
+def _fit_layer_text(text: str, max_tokens: int) -> str:
+    """按逗号分段保留整段，直到接近配额；不切断单个标签。"""
+    value = str(text or "").strip()
+    if not value or max_tokens <= 0:
+        return ""
+    max_chars = max_tokens * CHARS_PER_TOKEN
+    if len(value) <= max_chars:
+        return value
+    kept: list[str] = []
+    length = 0
+    for piece in value.split(","):
+        piece = piece.strip()
+        if not piece:
+            continue
+        extra = len(piece) + (2 if kept else 0)
+        if kept and length + extra > max_chars:
+            break
+        kept.append(piece)
+        length += extra
+    return ", ".join(kept)
+
+
 def _safe_resource_name(value: str, label: str) -> str:
     name = str(value or "").strip()
     if (
@@ -1407,23 +1478,23 @@ def build_prompt_snapshot(
     positive = ", ".join(
         _dedupe_parts(
             [
-                settings["style_positive"],
-                generation_prompt,
-                core_tags,
-                type_positive,
+                _fit_layer_text(settings["style_positive"], LAYER_BUDGET_TOKENS["style"]),
+                _fit_layer_text(generation_prompt, LAYER_BUDGET_TOKENS["generation"]),
+                _fit_layer_text(core_tags, LAYER_BUDGET_TOKENS["generation"]),
+                _fit_layer_text(type_positive, LAYER_BUDGET_TOKENS["type"]),
                 settings["user_positive"],
-                thumbnail_positive,
+                _fit_layer_text(thumbnail_positive, LAYER_BUDGET_TOKENS["thumbnail"]),
             ]
         )
     )
     negative = ", ".join(
         _dedupe_parts(
             [
-                settings["style_negative"],
-                common_negative,
-                type_negative,
+                _fit_layer_text(settings["style_negative"], LAYER_BUDGET_TOKENS["style"]),
+                _fit_layer_text(common_negative, LAYER_BUDGET_TOKENS["type"]),
+                _fit_layer_text(type_negative, LAYER_BUDGET_TOKENS["type"]),
                 settings["user_negative"],
-                thumbnail_negative,
+                _fit_layer_text(thumbnail_negative, LAYER_BUDGET_TOKENS["thumbnail"]),
             ]
         )
     )
@@ -1439,6 +1510,15 @@ def build_prompt_snapshot(
         generation_width, generation_height = (
             int(item) for item in target["generation_size"]
         )
+    if (
+        preset_type == "pose"
+        and not settings.get("generate_at_output_size")
+        and generation_height > generation_width
+        and _pose_is_horizontal(preset)
+    ):
+        # 横躺类体位在竖幅画布里必然被裁切：生成与输出尺寸同时改为横幅
+        generation_width, generation_height = generation_height, generation_width
+        output_width, output_height = output_height, output_width
     for width, height in (
         (generation_width, generation_height),
         (output_width, output_height),

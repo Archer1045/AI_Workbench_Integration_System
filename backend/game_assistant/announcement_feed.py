@@ -328,6 +328,31 @@ def _refresh_maintenance(
     return noticed
 
 
+def _stamp(value: datetime | None) -> int | None:
+    return int(value.timestamp()) if value is not None else None
+
+
+def _window_text_from(starts_at: datetime | None, ends_at: datetime | None) -> str:
+    start = starts_at.isoformat() if starts_at else "无"
+    end = ends_at.isoformat() if ends_at else "无"
+    return f"{start} ~ {end}"
+
+
+def _window_text(event: schedule.UpcomingEvent) -> str:
+    return _window_text_from(event.starts_at, event.ends_at)
+
+
+def _same_window(
+    event: schedule.UpcomingEvent,
+    starts_at: datetime | None,
+    ends_at: datetime | None,
+) -> bool:
+    """比对已确认日程与本次解析出的时间是否一致。"""
+    return _stamp(event.starts_at) == _stamp(starts_at) and _stamp(event.ends_at) == _stamp(
+        ends_at
+    )
+
+
 def refresh_schedule(
     *,
     now: datetime | None = None,
@@ -343,7 +368,8 @@ def refresh_schedule(
     """
     moment = now or datetime.now(SHANGHAI)
     result: dict[str, Any] = {
-        "added": [], "updated": [], "skipped": [], "stale": [], "errors": [], "checked": 0,
+        "added": [], "updated": [], "skipped": [], "stale": [], "errors": [],
+        "changed": [], "checked": 0,
     }
     try:
         announcements = list_fetcher(page_size=page_size)
@@ -356,11 +382,6 @@ def refresh_schedule(
     for item in event_announcements[: max(1, int(limit))]:
         event_id = f"official-{item['id']}"
         current = existing.get(event_id)
-        if current is not None and current.status == schedule.STATUS_CONFIRMED:
-            result["skipped"].append(
-                {"event_id": event_id, "title": current.title, "why": "已确认，不动"}
-            )
-            continue
         result["checked"] += 1
         try:
             detail = detail_fetcher(int(item["id"]))
@@ -390,10 +411,34 @@ def refresh_schedule(
             "source_url": f"https://game.bilibili.com/fgo/news.html#!news/0/1/{item['id']}",
             "note": note,
         }
-        schedule.upsert_event(payload, confirm=False)
+        # 已确认的条目不再一律跳过：官网是最终参照，时间变了就跟着改。
+        if current is not None and current.status == schedule.STATUS_CONFIRMED:
+            if _same_window(current, starts_at, ends_at):
+                result["skipped"].append(
+                    {"event_id": event_id, "title": title, "why": "已确认且官网时间未变"}
+                )
+                continue
+            schedule.upsert_event(payload, confirm=True)
+            result["changed"].append(
+                {
+                    "event_id": event_id,
+                    "title": title,
+                    "before": _window_text(current),
+                    "after": _window_text_from(starts_at, ends_at),
+                }
+            )
+            continue
+        # 时间解析成功才自动确认；解析失败仍留候选，避免把错日期写进日程。
+        auto_confirm = starts_at is not None
+        schedule.upsert_event(payload, confirm=auto_confirm)
         bucket = "updated" if current is not None else "added"
         result[bucket].append(
-            {"event_id": event_id, "title": title, "starts_at": payload["starts_at"]}
+            {
+                "event_id": event_id,
+                "title": title,
+                "starts_at": payload["starts_at"],
+                "confirmed": auto_confirm,
+            }
         )
     result["candidate_total"] = sum(
         1 for item in schedule.load_schedule() if item.status == schedule.STATUS_CANDIDATE

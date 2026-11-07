@@ -76,15 +76,50 @@ R18_TAG_DICTIONARY = {
 }
 
 
+from pathlib import Path
+
+# 2026-11-06：本地 tag 中文表（2,200 条高频 tag），优先于 LLM 翻译
+TAG_ZH_PATH = Path(r"D:\AI\danbooru-tags\tag_zh.json")
+TAG_ZH_TABLE: dict[str, str] = {}
+
+
+def _load_tag_zh() -> None:
+    global TAG_ZH_TABLE
+    if TAG_ZH_TABLE or not TAG_ZH_PATH.exists():
+        return
+    try:
+        import json as _json
+
+        raw = _json.loads(TAG_ZH_PATH.read_text(encoding="utf-8"))
+        TAG_ZH_TABLE = {str(k).lower(): str(v) for k, v in raw.items()}
+    except Exception:
+        TAG_ZH_TABLE = {}
+
+
 def _local_tag_translation(text: str) -> str:
     """本地词典优先翻译，全部命中才返回结果。"""
+    _load_tag_zh()
     tags = [tag.strip() for tag in text.split(",") if tag.strip()]
     translated: list[str] = []
     for tag in tags:
         key = tag.replace("_", " ").strip().lower()
-        translated.append(R18_TAG_DICTIONARY.get(key, ""))
+        raw_key = tag.strip().lower()
+        value = (
+            R18_TAG_DICTIONARY.get(key)
+            or TAG_ZH_TABLE.get(raw_key)
+            or TAG_ZH_TABLE.get(key)
+            or ""
+        )
+        translated.append(value)
     if translated and all(translated):
         return "，".join(translated)
+    # 部分命中：命中率够高时用本地结果，未命中的 tag（多为角色/作品名）保留英文
+    if translated:
+        hits = sum(1 for item in translated if item)
+        if hits and hits >= len(translated) * 0.6:
+            return "，".join(
+                value or tags[index] for index, value in enumerate(translated)
+            )
     return ""
 
 

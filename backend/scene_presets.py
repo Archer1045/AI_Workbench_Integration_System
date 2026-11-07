@@ -4,8 +4,16 @@ from __future__ import annotations
 import re
 
 import scene_presets_20261102
+import scene_presets_20261105
 
 CATEGORIES = (
+    "装置与陈设",
+    "自然景观",
+    "废墟遗迹",
+    "特色空间",
+    "天气",
+    "玄幻",
+    "科幻",
     "拘束与固定",
     "权力交换",
     "感官控制",
@@ -24,6 +32,9 @@ CATEGORIES = (
 RATINGS = ("普通", "R18")
 INTENSITIES = ("标准", "强化", "极限")
 SETTINGS = (
+    "户外",
+    "废墟",
+    "科幻",
     "室内",
     "地牢",
     "实验室",
@@ -3018,4 +3029,45 @@ PRIVATE_SCENE_IDS = tuple(
     str(item["id"])
     for item in scene_presets_20261102.SCENE_PRESET_DEFINITIONS
     if item["rating"] == "R18"
+)
+
+
+# 2026-11-05：旧细分类并入「装置与陈设」，只改输出分类，不动原始数据
+_LEGACY_CATEGORY_MERGE = {
+    "拘束与固定": "装置与陈设",
+    "权力交换": "装置与陈设",
+    "感官控制": "装置与陈设",
+    "乳胶/皮革": "装置与陈设",
+    "器械与工业": "装置与陈设",
+    "展示与陈列": "装置与陈设",
+    "身体改造展示": "装置与陈设",
+}
+
+for _existing_scene in SCENE_PRESETS:
+    _merged_category = _LEGACY_CATEGORY_MERGE.get(_existing_scene.get("category", ""))
+    if _merged_category:
+        _existing_scene["category"] = _merged_category
+
+for _scene_definition in scene_presets_20261105.SCENE_PRESET_DEFINITIONS:
+    SCENE_PRESETS.append(
+        _daily_scene(
+            _scene_definition["id"],
+            _scene_definition["category"],
+            _scene_definition["label"],
+            _scene_definition["translation"],
+            list(_scene_definition["tags"]),
+            rating=_scene_definition["rating"],
+            intensity=_scene_definition["intensity"],
+            setting=_scene_definition["setting"],
+            equipment=list(_scene_definition["equipment"]),
+            camera=_scene_definition["camera"],
+            lighting=_scene_definition["lighting"],
+            draw_prompt=_scene_definition["draw_prompt"],
+        )
+    )
+
+_EXTRA_DAILY_IDS = tuple(
+    str(item["id"])
+    for item in scene_presets_20261105.SCENE_PRESET_DEFINITIONS
+    if item["rating"] == "普通"
 )

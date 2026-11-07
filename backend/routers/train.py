@@ -1311,6 +1311,9 @@ def start_training(payload: dict = Body(...)) -> dict:
         "safetensors",
         "--network_module",
         "networks.lora_anima",
+        # 只训练 DiT，不训练 text encoder：anima 脚本默认会训 text encoder，
+        # 那样会把画风写进文本编码器，导致生成时风格污染。
+        "--network_train_unet_only",
         "--network_dim",
         str(network_dim),
         "--network_alpha",

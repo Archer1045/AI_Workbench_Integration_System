@@ -204,6 +204,7 @@ def build_workflow(
         "class_type": "CLIPTextEncode",
         "inputs": {"clip": ["2", 0], "text": negative_prompt.strip()},
     }
+
     graph[lat_id] = {
         "class_type": "EmptyLatentImage",
         "inputs": {"width": int(width), "height": int(height), "batch_size": 1},

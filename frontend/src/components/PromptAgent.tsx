@@ -1,5 +1,6 @@
 // 提示词 Agent 工作区：图片反推 + 自然语言生成 + 智能拆分
 import { Button, Checkbox, Input, InputNumber, message, Modal, Radio, Segmented, Select, Space, Tag, Tooltip } from 'antd';
+import PromptChatPanel from './PromptChatPanel';
 import { useEffect, useState } from 'react';
 import {
   api,
@@ -76,6 +77,7 @@ function todayLabel(): string {
 }
 
 export default function PromptAgent() {
+  const [chatMode, setChatMode] = useState(true);
   const { restrictionEnabled } = settingsStore;
   // 注意：resso store 的每次属性读取都会注册一次 hook，必须在组件顶部无条件读取，
   // 否则条件读取会导致 "Rendered fewer hooks than expected" 崩溃（2026-10-11 事故）。
@@ -515,16 +517,35 @@ export default function PromptAgent() {
 
   return (
     <div className="prompt-layout">
-      <Radio.Group
-        value={mode}
-        onChange={(e) => (promptStore.mode = e.target.value)}
-        optionType="button"
-        style={{ marginBottom: 12 }}
-      >
-        <Radio.Button value="image">图片反推</Radio.Button>
-        <Radio.Button value="text">文字生成</Radio.Button>
-      </Radio.Group>
-      <div className="draw-grid">
+      <div className="prompt-mode-bar">
+        <Radio.Group
+          value={chatMode ? 'chat' : 'form'}
+          onChange={(e) => setChatMode(e.target.value === 'chat')}
+          optionType="button"
+          style={{ marginBottom: 12 }}
+        >
+          <Radio.Button value="chat">对话</Radio.Button>
+          <Radio.Button value="form">表单</Radio.Button>
+        </Radio.Group>
+        {chatMode ? (
+          <span className="prompt-mode-hint">说角色名或描述，Agent 会查库拼提示词</span>
+        ) : null}
+      </div>
+
+      {chatMode ? (
+        <PromptChatPanel />
+      ) : (
+        <>
+          <Radio.Group
+            value={mode}
+            onChange={(e) => (promptStore.mode = e.target.value)}
+            optionType="button"
+            style={{ marginBottom: 12 }}
+          >
+            <Radio.Button value="image">图片反推</Radio.Button>
+            <Radio.Button value="text">文字生成</Radio.Button>
+          </Radio.Group>
+          <div className="draw-grid">
         <div className="controls panel-box">
           {mode === 'image' ? (
             <>
@@ -936,6 +957,8 @@ export default function PromptAgent() {
         onApply={applyPresetComposition}
         initialSelection={presetCompositionInitialSelection}
       />
+        </>
+      )}
     </div>
   );
 }

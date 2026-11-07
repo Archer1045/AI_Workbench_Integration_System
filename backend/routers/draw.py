@@ -103,6 +103,23 @@ ACTIVE_BATCH_LOCK = threading.Lock()
 ACTIVE_BATCH_ID: str | None = None
 
 
+TURBO_LORA_STEM = "anima-turbo-lora-v0.2"
+
+
+def _ensure_turbo_lora(loras: list) -> list:
+    """强制包含 anima-turbo LoRA。
+
+    2026-11-06 用户确认：缺少 anima-turbo-lora-v0.2 时画面会发白、对比度低、
+    角色特征不稳定；历史 7,616 条记录中 7,580 条都带了它。因此在所有生成入口
+    统一注入，避免漏选。
+    """
+    names = [str(item) for item in loras if str(item).strip()]
+    if any(TURBO_LORA_STEM in name for name in names):
+        return names
+    names.append(TURBO_LORA_STEM)
+    return names
+
+
 def _validate_lora_compatibility(loras: list) -> None:
     """拦截 Wan/视频架构 LoRA，避免 Anima/Qwen 绘画链路加载报错。"""
     bad: list[str] = []
@@ -1920,14 +1937,15 @@ def draw_batch(payload: dict = Body(...)):
     total = sum(group["count"] for group in groups)
     if total > MAX_TOTAL_COUNT:
         raise HTTPException(status_code=400, detail=f"总张数最多 {MAX_TOTAL_COUNT} 张")
-    _validate_lora_compatibility(payload.get("loras") or [])
+    batch_loras = _ensure_turbo_lora(payload.get("loras") or [])
+    _validate_lora_compatibility(batch_loras)
 
     settings = _parse_draw_settings(payload, model)
     generation_config = {
         "negative_prompt": fallback_negative,
         **settings,
         "model": model,
-        "loras": payload.get("loras") or [],
+        "loras": batch_loras,
         "seed": payload.get("seed"),
     }
 
@@ -2023,7 +2041,8 @@ def draw(payload: dict = Body(...)):
         payload.get("prompt_document"),
         str(payload.get("negative_prompt") or ""),
     )
-    _validate_lora_compatibility(payload.get("loras") or [])
+    single_loras = _ensure_turbo_lora(payload.get("loras") or [])
+    _validate_lora_compatibility(single_loras)
     settings = _parse_draw_settings(payload, model)
     with task_registry.resource_scope(
         "draw",
@@ -2038,7 +2057,7 @@ def draw(payload: dict = Body(...)):
             settings["steps"],
             settings["cfg"],
             model,
-            payload.get("loras") or [],
+            single_loras,
             payload.get("seed"),
             None,
             0,
@@ -2458,7 +2477,7 @@ def create_inpaint_job(payload: dict = Body(...)):
     masked_prompt = str(payload.get("masked_prompt") or "").strip() or prompt
     _validate_inpaint_text(masked_prompt)
     model = _validate_model(payload.get("model"))
-    loras = [str(item) for item in (payload.get("loras") or []) if str(item).strip()]
+    loras = _ensure_turbo_lora(payload.get("loras") or [])
     _validate_lora_compatibility(loras)
 
     try:

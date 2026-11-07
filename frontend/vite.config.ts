@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
 import { cp, rm } from 'fs/promises';
 import net from 'net';
 import path from 'path';
@@ -56,8 +56,6 @@ async function waitBackend(maxWaitMs = 30000): Promise<boolean> {
 
 // Vite 插件：前端启动时自动拉起后端
 function autoStartBackend(): Plugin {
-  let backendProcess: ChildProcess | null = null;
-
   return {
     name: 'auto-start-backend',
     configureServer(server) {
@@ -76,7 +74,7 @@ function autoStartBackend(): Plugin {
           return;
         }
         console.log('[backend] 后端未运行，自动启动...');
-        backendProcess = spawn(PYTHON, ['run.py'], {
+        spawn(PYTHON, ['run.py'], {
           cwd: BACKEND_DIR,
           stdio: 'inherit',
           windowsHide: true,
@@ -85,14 +83,9 @@ function autoStartBackend(): Plugin {
         console.log(ready ? '[backend] 后端已就绪' : '[backend] 后端启动超时');
       })();
 
-      // 前端退出时关闭由前端拉起的后端
-      const shutdown = () => {
-        if (backendProcess) {
-          backendProcess.kill();
-        }
-      };
-      process.on('exit', shutdown);
-      server.httpServer?.once('close', shutdown);
+      // 2026-11-05：前端退出不再关闭后端。
+      // 后端可能正在执行长任务（绘画/训练/补图），前端 dev server 重启不应连坐中止任务。
+      void server;
     },
   };
 }

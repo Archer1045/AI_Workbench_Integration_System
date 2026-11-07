@@ -258,31 +258,24 @@ export default function GameAssistantPanel() {
     <div className="game-assistant">
       {contextHolder}
       <div className="ga-systembar">
-        <span className="ga-status">
-          <span className={`ga-dot ${bootstrap ? '' : 'orange'}`} />
-          {bootstrap ? '公开知识库已加载' : '正在加载公开知识库'}
+        <span className={`ga-pill ${bootstrap ? "green" : "orange"}`}>
+          {bootstrap ? "知识库已加载" : "正在加载知识库"}
         </span>
-        <span className="ga-status">
-          <DatabaseOutlined />
-          账号快照独立保存 · 攻略生成不读取账号数据
+        <span className="ga-pill">
+          <ClockCircleOutlined /> 服务端 {eventView ? phaseTime(eventView.server_time) : "等待中"}
         </span>
-        <span className="ga-status">
-          <SafetyCertificateOutlined />
-          执行器已接入「执行」页 · 每次运行都会真实扣 AP
-        </span>
-        <span className="ga-status">
-          <ClockCircleOutlined />
-          {eventView ? `服务端时间 ${phaseTime(eventView.server_time)}` : '等待状态'}
-        </span>
-        <span className="ga-status">
-          <PlayCircleOutlined />
+        <span className="ga-pill">
+          <PlayCircleOutlined />{" "}
           {missingEventData
-            ? '活动已开始 · 资料待导入'
+            ? "活动已开始 · 资料待导入"
             : noCurrentEvent
-              ? '暂无进行中的主要活动'
+              ? "暂无进行中的主要活动"
               : ended
-                ? '本期活动已结束'
-                : eventView?.current_phase?.name || '当前阶段未识别'}
+                ? "本期活动已结束"
+                : eventView?.current_phase?.name || "当前阶段未识别"}
+        </span>
+        <span className="ga-systembar-note">
+          账号快照独立保存 · 执行器已接入「执行」页
         </span>
         <Button size="small" icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
           模型设置
@@ -414,23 +407,23 @@ export default function GameAssistantPanel() {
                   </Button>
                 </div>
               </div>
-              <div className="ga-stats">
-                <span className="ga-stat">
-                  <span className="ga-small ga-muted">活动周期</span>
-                  <b>{eventSpanDays} 天</b>
-                </span>
-                <span className="ga-stat">
-                  <span className="ga-small ga-muted">商店剩余</span>
-                  <b>{shopLeftLabel}</b>
-                </span>
-                <span className="ga-stat">
-                  <span className="ga-small ga-muted">阶段数</span>
+              <div className="ga-stat-cards">
+                <div className="ga-stat-card">
+                  <span>活动周期</span>
+                  <b>{eventSpanDays}<small>天</small></b>
+                </div>
+                <div className="ga-stat-card">
+                  <span>阶段数</span>
                   <b>{eventView.event.phases.length}</b>
-                </span>
-                <span className="ga-stat">
-                  <span className="ga-small ga-muted">可刷关卡</span>
+                </div>
+                <div className="ga-stat-card">
+                  <span>可刷关卡</span>
                   <b>{availableFreeQuests.length}</b>
-                </span>
+                </div>
+                <div className="ga-stat-card">
+                  <span>商店剩余</span>
+                  <b>{shopLeftLabel}</b>
+                </div>
               </div>
               {genError ? (
                 <Alert
@@ -445,31 +438,53 @@ export default function GameAssistantPanel() {
 
             {!ended || detailOpen ? (
             <>
-            <div className="ga-grid-3">
-              <div className="ga-card">
-                <p className="ga-small ga-muted">{ended ? '最后阶段' : '当前阶段'}</p>
-                <strong>{eventView.current_phase?.name || '未开始'}</strong>
-                <p className="ga-small ga-muted">
-                  {eventView.current_phase?.summary || '等待阶段资料'}
-                </p>
+            <section className="ga-focus">
+              <h2>现在该做什么</h2>
+              <div className="ga-focus-head">
+                <span className="ga-phase-badge">
+                  {ended ? "最后阶段" : "当前阶段"} · {eventView.current_phase?.name || "未开始"}
+                </span>
+                <span className="ga-focus-desc">
+                  {eventView.current_phase?.summary || "等待阶段资料"}
+                </span>
               </div>
-              <div className="ga-card">
-                <p className="ga-small ga-muted">{ended ? '后续阶段' : '下一开放'}</p>
-                <strong>{eventView.next_phase?.name || '无'}</strong>
-                <p className="ga-small ga-muted">
-                  {eventView.next_phase
-                    ? `${phaseTime(eventView.next_phase.opens_at)} · ${eventView.next_phase.unlock_condition}`
-                    : '没有已登记的后继阶段'}
-                </p>
+              <div className="ga-focus-actions">
+                <div className="ga-action-item">
+                  <span className="ga-action-tag">挑战</span>
+                  <span>
+                    {eventView.next_phase
+                      ? `下一开放：${eventView.next_phase.name}`
+                      : "高难度挑战关卡 · 首次通关获得传承结晶"}
+                  </span>
+                  <Button
+                    type="link"
+                    size="small"
+                    onClick={() => setActiveSection("calendar")}
+                  >
+                    查看活动日历 →
+                  </Button>
+                </div>
+                <div className="ga-action-item">
+                  <span className="ga-action-tag">周回</span>
+                  <span>
+                    {availableFreeQuests.length} 个可刷关卡
+                    {ended ? "（活动已结束，仅供复盘）" : " · 优先刷活动点数"}
+                  </span>
+                  <Button type="link" size="small" onClick={toggleMaterials}>
+                    {materialsOpen ? "收起关卡表 →" : "查看掉落 →"}
+                  </Button>
+                </div>
               </div>
-              <div className="ga-card">
-                <p className="ga-small ga-muted">{ended ? '已结束的关卡' : '当前自由本'}</p>
-                <strong>{availableFreeQuests.length} 个</strong>
-                <p className="ga-small ga-muted">
-                  {ended ? '活动已结束，这些关卡不能再刷（保留作复盘）' : '仅表示公共时间表已开放，不代表账号首通状态'}
-                </p>
+              <div className="ga-focus-foot">
+                <span>
+                  {ended ? "已结束" : "下一开放"}：{eventView.next_phase?.name || "无"} · 当前自由本{" "}
+                  {availableFreeQuests.length} 个
+                </span>
+                <Button size="small" type="text" onClick={toggleMaterials}>
+                  {materialsOpen ? "收起活动资料" : "活动资料 ∨"}
+                </Button>
               </div>
-            </div>
+            </section>
 
             {/* 长内容收进「活动资料」，默认收起（2026-10-15 布局优化） */}
             <div className="ga-slim-row">
@@ -584,8 +599,47 @@ export default function GameAssistantPanel() {
                 </button>
               ))}
             </div>
-            <div className="ga-soft ga-side-card">
-              <strong>生成 Provider</strong>
+            <div className="ga-result-card">
+              <div className="ga-row ga-between">
+                <strong>攻略结果</strong>
+                {result ? (
+                  <span className={`ga-pill ${result.fallback_reason ? 'orange' : 'green'}`}>
+                    {result.fallback_reason ? '已回退模板' : '已生成'}
+                  </span>
+                ) : (
+                  <span className="ga-pill">未生成</span>
+                )}
+              </div>
+              {result ? (
+                <>
+                  <p className="ga-small ga-muted">
+                    {phaseTime(result.created_at)} · {result.provider_used} · {result.model}
+                  </p>
+                  <p className="ga-small">目标：{result.plan.objective}</p>
+                  <div className="ga-result-preview">
+                    {result.guide.sections.slice(0, 2).map((section) => (
+                      <div key={section.heading} className="ga-result-section">
+                        <strong>{section.heading}</strong>
+                        <ul>
+                          {section.bullets.slice(0, 2).map((bullet) => (
+                            <li key={bullet}>{bullet}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                  <Button size="small" block onClick={openResult}>
+                    查看完整攻略
+                  </Button>
+                </>
+              ) : (
+                <p className="ga-small ga-muted">
+                  点活动卡片右上角的「生成当前阶段攻略」，生成后结果会显示在这里。
+                </p>
+              )}
+            </div>
+            <details className="ga-soft ga-side-card ga-fold">
+              <summary>生成 Provider 与模型</summary>
               <Select
                 value={provider}
                 onChange={setProvider}
@@ -599,30 +653,15 @@ export default function GameAssistantPanel() {
                   <span className="ga-small ga-muted">{status.available ? '可用' : '未配置'}</span>
                 </div>
               ))}
-            </div>
+            </details>
             <Input.TextArea
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
               autoSize={{ minRows: 3, maxRows: 5 }}
               placeholder="描述本次攻略目标"
             />
-            <Button
-              type="default"
-              icon={<PlayCircleOutlined />}
-              loading={generating}
-              disabled={missingEventData || noCurrentEvent || !providerAvailable(providers, provider)}
-              onClick={() => void generate()}
-            >
-              {missingEventData
-                ? '活动资料待导入'
-                : noCurrentEvent
-                  ? '暂无本期活动'
-                  : ended
-                    ? '生成复盘攻略'
-                    : '生成当前阶段攻略'}
-            </Button>
             <p className="ga-small ga-muted">
-              生成后结果会从右侧滑出；关掉也不会丢，头卡上有「查看上次结果」。
+              主操作在活动卡片右上角；生成后结果会从右侧滑出，头卡上也有「查看上次结果」。
             </p>
             <div className="ga-soft ga-side-card">
               <div className="ga-row ga-between">

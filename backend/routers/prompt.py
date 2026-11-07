@@ -1939,3 +1939,245 @@ def clarify_prompt(
         "prompt_translation": "",
         "groups": [],
     }
+
+
+@router.post("/api/prompt-agent/chat")
+def prompt_agent_chat(payload: dict = Body(...)):
+    """对话式提示词助手：查角色/服装/tag，拼提示词并附带中文翻译。"""
+    import prompt_chat
+    import prompt_chat_logic
+
+    messages = payload.get("messages") or []
+    if not isinstance(messages, list) or not messages:
+        raise HTTPException(status_code=400, detail="messages 不能为空")
+    user_text = ""
+    for item in reversed(messages):
+        if isinstance(item, dict) and item.get("role") == "user":
+            user_text = str(item.get("content") or "").strip()
+            break
+    if not user_text:
+        raise HTTPException(status_code=400, detail="最后一条消息必须来自用户")
+
+    import time as _time
+
+    _started = _time.monotonic()
+    _marks: dict[str, float] = {}
+
+    def _mark(name: str) -> None:
+        _marks[name] = round((_time.monotonic() - _started) * 1000, 1)
+
+    # 1) 与提示词无关的问题
+    if prompt_chat_logic.is_off_topic(user_text):
+        reply = prompt_chat_logic.off_topic_reply(user_text)
+        _mark("llm")
+        return {
+            "reply": reply,
+            "prompt": "",
+            "prompt_translation": "",
+            "tags": [],
+            "tool_calls": [],
+            "elapsed_ms": round((_time.monotonic() - _started) * 1000, 1),
+            "marks": _marks,
+        }
+
+    # 2) 先识别作品名（问「XX 作品有哪些角色」时走这里）
+    import prompt_chat_attribute
+    import prompt_chat_work
+
+    attribute = prompt_chat_attribute.detect_attribute(user_text)
+    work = prompt_chat_work.detect_work(user_text)
+    character_hit = prompt_chat_logic.detect_character(user_text)
+
+    # 2a) 属性查询 + 角色：例如「企业是什么发色」
+    if character_hit and attribute:
+        _mark("lookup")
+        return {
+            "reply": prompt_chat_attribute.character_attribute_reply(character_hit, attribute),
+            "prompt": "",
+            "prompt_translation": "",
+            "tags": [],
+            "tool_calls": [
+                {
+                    "tool": "query_attribute",
+                    "args": {"character": character_hit["name"], "attribute": attribute},
+                    "result": {"values": prompt_chat_attribute.pick_attribute(
+                        character_hit["appearance"], attribute
+                    )},
+                }
+            ],
+            "elapsed_ms": round((_time.monotonic() - _started) * 1000, 1),
+            "marks": _marks,
+        }
+
+    # 2b) 作品 + 属性：例如「五等分的花嫁各角色发色对比」
+    if work and attribute:
+        _mark("lookup")
+        data = prompt_chat_work.query_work_characters(work)
+        return {
+            "reply": prompt_chat_attribute.work_attribute_reply(work, data["items"], attribute),
+            "prompt": "",
+            "prompt_translation": "",
+            "tags": [],
+            "tool_calls": [
+                {
+                    "tool": "query_work_attribute",
+                    "args": {"work": work, "attribute": attribute},
+                    "result": {"total": data["total"], "shown": len(data["items"])},
+                }
+            ],
+            "elapsed_ms": round((_time.monotonic() - _started) * 1000, 1),
+            "marks": _marks,
+        }
+
+    if work and not character_hit:
+        _mark("lookup")
+        # 作品信息类问题（是什么作品 / 类型 / 年份）走元数据
+        info_words = ("是什么", "什么作品", "介绍", "类型", "哪年", "什么类型", "讲什么")
+        if any(word in user_text for word in info_words):
+            meta = prompt_chat_work.query_work_meta(work)
+            if meta:
+                counts = prompt_chat_work.query_work_characters(work, limit=1)["total"]
+                return {
+                    "reply": prompt_chat_work.build_work_meta_reply(meta, counts),
+                    "prompt": "",
+                    "prompt_translation": "",
+                    "tags": [],
+                    "tool_calls": [
+                        {
+                            "tool": "query_work_meta",
+                            "args": {"work": work},
+                            "result": {"genres": meta["genres"], "year": meta["year"]},
+                        }
+                    ],
+                    "elapsed_ms": round((_time.monotonic() - _started) * 1000, 1),
+                    "marks": _marks,
+                }
+
+        # 找类似作品
+        if any(word in user_text for word in ("类似", "相似", "差不多", "推荐")):
+            similar = prompt_chat_work.find_similar(work)
+            if similar:
+                lines = [f"和「{work}」相似的作品："]
+                for index, item in enumerate(similar, 1):
+                    lines.append(
+                        f"{index}. {item['work']}（{'/'.join(item['genres'])}，"
+                        f"重合：{'/'.join(item['overlap'])}）"
+                    )
+                return {
+                    "reply": "\n".join(lines),
+                    "prompt": "",
+                    "prompt_translation": "",
+                    "tags": [],
+                    "tool_calls": [
+                        {
+                            "tool": "find_similar",
+                            "args": {"work": work},
+                            "result": {"count": len(similar)},
+                        }
+                    ],
+                    "elapsed_ms": round((_time.monotonic() - _started) * 1000, 1),
+                    "marks": _marks,
+                }
+
+        try:
+            data = prompt_chat_work.query_work_characters(work)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=500, detail=f"作品查询失败: {exc}") from exc
+        return {
+            "reply": prompt_chat_work.build_work_reply(work, data),
+            "prompt": "",
+            "prompt_translation": "",
+            "tags": [],
+            "tool_calls": [
+                {
+                    "tool": "query_work",
+                    "args": {"work": work},
+                    "result": {"total": data["total"], "shown": len(data["items"])},
+                }
+            ],
+            "elapsed_ms": round((_time.monotonic() - _started) * 1000, 1),
+            "marks": _marks,
+        }
+
+    # 3) 识别角色与服装
+    character = character_hit
+    outfit = prompt_chat_logic.detect_outfit(user_text)
+    _mark("lookup")
+
+    if not character and not outfit:
+        return {
+            "reply": (
+                "没找到对应的角色或服装。可以说得更具体一点，"
+                "比如「配一个企业的提示词」「伊蕾娜 魔女装」。"
+            ),
+            "prompt": "",
+            "prompt_translation": "",
+            "tags": [],
+            "tool_calls": [],
+        }
+
+    prompt = prompt_chat.build_prompt(character, outfit)
+    _mark("build")
+    # 翻译走独立接口，避免阻塞主流程（LLM 翻译在 GPU 忙时要 40 秒以上）
+    translation = "" if payload.get("with_translation") else ""
+    _mark("translate")
+
+    # 3) 逐个 tag 查分类与帖子数（便于前端展示）
+    tags: list[dict] = []
+    seen: set[str] = set()
+    for part in prompt.split(","):
+        tag = part.strip()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        info = prompt_chat.lookup_tag(tag)
+        tags.append(
+            {
+                "tag": tag,
+                "category": (info or {}).get("category") or ("general" if info is None else ""),
+                "post_count": (info or {}).get("post_count") or 0,
+                "exists": info is not None,
+            }
+        )
+
+    tool_calls = []
+    if character:
+        tool_calls.append(
+            {
+                "tool": "query_character",
+                "args": {"name": character["name"]},
+                "result": {
+                    "identity": character["identity"],
+                    "appearance_count": len(character["appearance"]),
+                    "outfit": character["outfit"]["name"] if character.get("outfit") else None,
+                },
+            }
+        )
+    if outfit:
+        tool_calls.append(
+            {
+                "tool": "query_outfit",
+                "args": {"keyword": outfit["name"]},
+                "result": {"id": outfit["id"], "tags": outfit["tags"][:8]},
+            }
+        )
+
+    _mark("tags")
+    return {
+        "reply": prompt_chat_logic.build_reply(character, outfit, prompt),
+        "prompt": prompt,
+        "prompt_translation": translation,
+        "tags": tags,
+        "tool_calls": tool_calls,
+        "elapsed_ms": round((_time.monotonic() - _started) * 1000, 1),
+        "marks": _marks,
+    }
+
+
+@router.post("/api/prompt-agent/translate")
+def prompt_agent_translate(payload: dict = Body(...)):
+    """独立翻译接口：给前端异步补齐提示词中文翻译。"""
+    text_value = str(payload.get("text") or "").strip()
+    if not text_value:
+        raise HTTPException(status_code=400, detail="text 不能为空")
+    return {"translation": translate_text(text_value)}

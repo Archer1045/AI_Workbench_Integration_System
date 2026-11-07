@@ -12,12 +12,15 @@ describe('PromptAgent reverse-mode control', () => {
 
   it('switches to the visual-model mode without crashing', async () => {
     render(<PromptAgent />);
+    // 2026-11-06：默认进入对话模式，先切回表单再操作反推控件
+    fireEvent.click(screen.getByRole('radio', { name: '表单' }));
     fireEvent.click(screen.getByRole('radio', { name: '视觉模型' }));
     expect(promptStore.reverseMode).toBe('vlm');
   });
 
   it('switches back to wd14 and shows the threshold input again', async () => {
     render(<PromptAgent />);
+    fireEvent.click(screen.getByRole('radio', { name: '表单' }));
     fireEvent.click(screen.getByRole('radio', { name: '视觉模型' }));
     fireEvent.click(screen.getByRole('radio', { name: 'WD14 标签' }));
     expect(promptStore.reverseMode).toBe('wd14');

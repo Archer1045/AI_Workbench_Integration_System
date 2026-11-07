@@ -170,14 +170,19 @@ export default function CompanionPanel() {
   return (
     <div className="companion-layout">
       <div className="companion-side panel-box">
-        <div className="train-section-title">人设</div>
+        <div className="companion-side-head">
+          <h3>情感陪伴</h3>
+          <span>和角色聊天，记忆会累积</span>
+        </div>
+
+        <div className="companion-group-title">当前人设</div>
         <Select
           style={{ width: '100%' }}
           value={currentPersonaId || undefined}
           options={personas.map((item) => ({ label: `${item.name}（${item.relationship}${item.gender ? ` · ${item.gender}` : ''}）`, value: item.id }))}
           onChange={(value) => void switchCompanionPersona(value)}
         />
-        <Space style={{ marginTop: 8 }}>
+        <Space style={{ marginTop: 8 }} wrap>
           <Button size="small" icon={<PlusOutlined />} onClick={openCreate}>
             新建
           </Button>
@@ -199,9 +204,7 @@ export default function CompanionPanel() {
           </Popconfirm>
         </Space>
 
-        <div className="train-section-title" style={{ marginTop: 16 }}>
-          会话
-        </div>
+        <div className="companion-group-title">会话</div>
         <List
           size="small"
           dataSource={sessions}
@@ -229,11 +232,12 @@ export default function CompanionPanel() {
           新会话
         </Button>
 
-        <Space style={{ marginTop: 16 }}>
-          <Button size="small" icon={<ThunderboltOutlined />} onClick={() => setMemoryOpen(true)}>
-            记忆
+        <div className="companion-group-title">工具</div>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Button size="small" block icon={<ThunderboltOutlined />} onClick={() => setMemoryOpen(true)}>
+            长期记忆
           </Button>
-          <Button size="small" icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
+          <Button size="small" block icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
             设置
           </Button>
         </Space>
@@ -245,9 +249,17 @@ export default function CompanionPanel() {
             <div className="companion-empty">选择一个会话开始聊天吧</div>
           ) : (
             messages.map((item, index) => (
-              <div key={`${item.id}-${index}`} className={item.role === 'user' ? 'bubble user' : 'bubble agent'}>
-                {item.image_url ? <img className="companion-message-image" src={item.image_url} alt="聊天图片" /> : null}
-                {item.content ? <div className="companion-message-text">{item.content}</div> : null}
+              <div
+                key={`${item.id}-${index}`}
+                className={item.role === 'user' ? 'bubble user' : 'bubble agent'}
+              >
+                <div className="companion-avatar">{item.role === 'user' ? '你' : '伴'}</div>
+                <div className="companion-bubble-body">
+                  {item.image_url ? (
+                    <img className="companion-message-image" src={item.image_url} alt="聊天图片" />
+                  ) : null}
+                  {item.content ? <div className="companion-message-text">{item.content}</div> : null}
+                </div>
               </div>
             ))
           )}
