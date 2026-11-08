@@ -102,6 +102,26 @@ def _skill_index(q: str) -> int | None:
     return None
 
 
+LEVEL_PATTERNS = [
+    (r"专三|专精三|专3", 10),
+    (r"专二|专精二|专2", 9),
+    (r"专一|专精一|专1", 8),
+    (r"([1-7])级", None),  # 动态取数字
+]
+
+
+def _parse_skill_level(q: str) -> int | None:
+    """解析「专三」「专一」「7级」，默认返回 None（表示满级）。"""
+    for pattern, level in LEVEL_PATTERNS:
+        m = re.search(pattern, q)
+        if not m:
+            continue
+        if level is None:
+            return int(m.group(1))
+        return level
+    return None
+
+
 def classify_intent(q: str, op: dict | None, skill: dict | None) -> str:
     if any(w in q for w in LIST_WORDS) and not op:
         return "list"
@@ -163,6 +183,16 @@ def _op_skills(con: sqlite3.Connection, op_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def _skill_levels(con: sqlite3.Connection, skill_id: str) -> list[dict]:
+    """取技能的全部等级数据。"""
+    rows = con.execute(
+        "select level, level_label, sp_cost, init_sp, duration, description"
+        " from skill_level where skill_id = ? order by level",
+        (skill_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 SYSTEM_PROMPT = (
     "你是「明日方舟」助手。用户会问干员属性、技能效果、天赋、素材等问题。\n"
     "规则：\n"
@@ -173,7 +203,8 @@ SYSTEM_PROMPT = (
 )
 
 
-def answer(q: str) -> dict:
+def prepare(q: str) -> tuple[dict, str]:
+    """第一步：查数据、组装上下文。返回 (data, context)。"""
     con = _conn()
     try:
         op = _find_operator(q)
@@ -188,18 +219,38 @@ def answer(q: str) -> dict:
             lines.append(data.pop("_context", ""))
         elif intent == "skill" and op:
             idx = _skill_index(q)
+            lv = _parse_skill_level(q)
             skills = _op_skills(con, op["id"])
             data["operator"] = _op_payload(con, op)
             data["skills"] = skills
             if idx and 1 <= idx <= len(skills):
                 target = skills[idx - 1]
-                data["focus_skill"] = target
-                lines.append(f"干员：{op['name']}")
-                lines.append(
-                    f"第 {idx} 个技能：{target['name']}，技力 {target['sp_cost']}，"
-                    f"初始 {target['init_sp']}，持续 {target['duration']} 秒"
+                levels = _skill_levels(con, target["id"])
+                data["skill_levels"] = levels
+                # 默认专三；用户指定了等级就用指定的
+                use_level = lv or 10
+                picked = next((x for x in levels if x["level"] == use_level), None) or (
+                    levels[-1] if levels else None
                 )
-                lines.append(f"效果：{target['description']}")
+                if picked:
+                    data["focus_skill"] = {
+                        **target,
+                        **picked,
+                        "skill_index": idx,
+                    }
+                    lines.append(f"干员：{op['name']}")
+                    lines.append(f"第 {idx} 个技能：{target['name']}")
+                    lines.append(
+                        f"{picked['level_label']} 的数值：技力 {picked['sp_cost']}，"
+                        f"初始 {picked['init_sp']}，持续 {picked['duration']} 秒"
+                    )
+                    lines.append(f"效果：{picked['description']}")
+                    # 附上各等级的攻击力变化，方便对比
+                    if len(levels) > 1:
+                        brief = "、".join(
+                            f"{x['level_label']} {x['description'][:24]}" for x in levels
+                        )
+                        lines.append(f"各等级效果：{brief}")
             else:
                 lines.append(f"干员：{op['name']}，共 {len(skills)} 个技能")
                 for i, s in enumerate(skills, 1):
@@ -244,22 +295,37 @@ def answer(q: str) -> dict:
 
     context = "\n".join(x for x in lines if x)
     data["_context_len"] = len(context)
+    return data, context
 
+
+def build_messages(q: str, context: str) -> list[dict]:
+    """构造 LLM 消息。"""
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": f"资料：\n{context}\n\n问题：{q}"},
+    ]
+
+
+def fallback_text(context: str) -> str:
+    return context or "资料里没有找到相关内容。可以试试干员名，比如「银灰」「能天使」。"
+
+
+def answer(q: str) -> dict:
+    """非流式：一次性返回完整回复。"""
+    data, context = prepare(q)
     text = ""
     if llm.is_available() and context:
         try:
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"资料：\n{context}\n\n问题：{q}"},
-            ]
-            text = llm.chat(messages, temperature=0.3, max_tokens=400, timeout=90, think=False).strip()
+            text = llm.chat(
+                build_messages(q, context),
+                temperature=0.3,
+                max_tokens=400,
+                timeout=90,
+                think=False,
+            ).strip()
         except Exception as exc:
             data["llm_error"] = str(exc)[:200]
-
-    if not text:
-        text = context or "资料里没有找到相关内容。可以试试干员名，比如「银灰」「能天使」。"
-
-    data["text"] = text
+    data["text"] = text or fallback_text(context)
     return data
 
 

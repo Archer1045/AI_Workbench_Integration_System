@@ -11,7 +11,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 
 import ak_chat
-from fastapi.responses import FileResponse
+import llm
+from fastapi.responses import FileResponse, StreamingResponse
 
 router = APIRouter()
 
@@ -251,3 +252,61 @@ def ak_chat_endpoint(request: AkChatRequest) -> dict:
     if not q:
         raise HTTPException(status_code=400, detail="query 不能为空")
     return ak_chat.answer(q)
+
+# ── 流式对话（SSE） ──
+
+import json as _json  # noqa: E402
+
+
+def _sse(payload: dict) -> str:
+    return f"data: {_json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+@router.post("/api/ak/chat/stream")
+def ak_chat_stream(request: AkChatRequest):
+    """流式对话：先返回数据（meta），再逐字返回文字（delta）。"""
+    q = (request.query or "").strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="query 不能为空")
+
+    def generate():
+        try:
+            data, context = ak_chat.prepare(q)
+        except Exception as exc:
+            yield _sse({"type": "error", "message": str(exc)[:200]})
+            return
+
+        # 先发数据，前端可以立刻渲染干员卡
+        meta = {k: v for k, v in data.items() if not k.startswith("_")}
+        yield _sse({"type": "meta", **meta})
+
+        if not context:
+            yield _sse({"type": "delta", "content": ak_chat.fallback_text(context)})
+            yield _sse({"type": "done"})
+            return
+
+        if not llm.is_available():
+            yield _sse({"type": "delta", "content": ak_chat.fallback_text(context)})
+            yield _sse({"type": "done"})
+            return
+
+        try:
+            messages = ak_chat.build_messages(q, context)
+            for kind, chunk in llm.stream_chat(
+                messages, temperature=0.3, max_tokens=400, timeout=180
+            ):
+                if kind == "answer" and chunk:
+                    yield _sse({"type": "delta", "content": chunk})
+        except Exception as exc:
+            yield _sse({"type": "error", "message": str(exc)[:200]})
+
+        yield _sse({"type": "done"})
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

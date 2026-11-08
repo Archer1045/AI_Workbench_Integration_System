@@ -37,6 +37,18 @@ type Skill = {
   init_sp: number | null;
   duration: number | null;
   description: string;
+  level?: number;
+  level_label?: string;
+  skill_index?: number;
+};
+
+type SkillLevel = {
+  level: number;
+  level_label: string;
+  sp_cost: number | null;
+  init_sp: number | null;
+  duration: number | null;
+  description: string;
 };
 
 type OperatorBrief = {
@@ -50,9 +62,11 @@ type OperatorBrief = {
 type Message = {
   role: 'user' | 'assistant';
   content: string;
+  streaming?: boolean;
   operator?: Operator;
   skills?: Skill[];
   focusSkill?: Skill;
+  skillLevels?: SkillLevel[];
   operators?: OperatorBrief[];
   listLabel?: string;
 };
@@ -86,37 +100,103 @@ export default function AkPanel() {
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', content: q }]);
     setLoading(true);
-    try {
-      // 走对话接口：后端做意图路由 + 实体提取 + LLM 润色
-      const r = await api.post('/ak/chat', { query: q });
-      const d = r.data;
 
-      // 对话接口返回的 operator 是精简版，需要补全详情
-      let op: Operator | undefined;
-      if (d.operator?.name) {
-        try {
-          const detail = await api.get(`/ak/operator/${encodeURIComponent(d.operator.name)}`);
-          op = detail.data;
-        } catch {
-          /* 忽略 */
+    // 先占一条空消息，随后逐步填充
+    const placeholderIndex = { current: -1 };
+    setMessages((prev) => {
+      placeholderIndex.current = prev.length;
+      return [
+        ...prev,
+        { role: 'assistant', content: '', streaming: true },
+      ];
+    });
+
+    const patchLast = (patch: Partial<Message>) => {
+      setMessages((prev) => {
+        const idx = placeholderIndex.current;
+        if (idx < 0 || idx >= prev.length) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...patch };
+        return next;
+      });
+    };
+
+    const appendText = (chunk: string) => {
+      setMessages((prev) => {
+        const idx = placeholderIndex.current;
+        if (idx < 0 || idx >= prev.length) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], content: (next[idx].content || '') + chunk };
+        return next;
+      });
+    };
+
+    try {
+      const resp = await fetch('/api/ak/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // 按 SSE 的 \n\n 分帧
+        let sep = buffer.indexOf('\n\n');
+        while (sep >= 0) {
+          const frame = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          sep = buffer.indexOf('\n\n');
+
+          for (const line of frame.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            let evt: any;
+            try {
+              evt = JSON.parse(line.slice(6));
+            } catch {
+              continue;
+            }
+            if (evt.type === 'meta') {
+              // 数据先到：补全 operator 详情并渲染卡片
+              patchLast({
+                skills: evt.skills || undefined,
+                focusSkill: evt.focus_skill || undefined,
+                skillLevels: evt.skill_levels || undefined,
+                operators: evt.operators || undefined,
+                listLabel: evt.list_label || undefined,
+              });
+              if (evt.operator?.name) {
+                api
+                  .get(`/ak/operator/${encodeURIComponent(evt.operator.name)}`)
+                  .then((detail) => patchLast({ operator: detail.data }))
+                  .catch(() => undefined);
+              }
+            } else if (evt.type === 'delta' && evt.content) {
+              appendText(evt.content);
+            } else if (evt.type === 'error') {
+              appendText(`\n[出错了：${evt.message}]`);
+            }
+          }
         }
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: d.text || '没有找到相关内容。',
-          operator: op,
-          skills: d.skills || undefined,
-          focusSkill: d.focus_skill || undefined,
-          operators: d.operators || undefined,
-          listLabel: d.list_label || undefined,
-        },
-      ]);
     } catch (err) {
       message.error(`查询失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
+      setMessages((prev) => {
+        const idx = placeholderIndex.current;
+        if (idx < 0 || idx >= prev.length) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], streaming: false };
+        return next;
+      });
       setLoading(false);
     }
   };
@@ -229,12 +309,38 @@ export default function AkPanel() {
 
               {item.focusSkill ? (
                 <div className="ak-skill-focus">
-                  <div className="ak-skill-name">{item.focusSkill.name}</div>
+                  <div className="ak-skill-head">
+                    <span className="ak-skill-name">{item.focusSkill.name}</span>
+                    {item.focusSkill.level_label ? (
+                      <span className="ak-skill-level">{item.focusSkill.level_label}</span>
+                    ) : null}
+                  </div>
                   <div className="ak-skill-meta">
                     技力 {item.focusSkill.sp_cost ?? '-'} · 初始 {item.focusSkill.init_sp ?? '-'} · 持续{' '}
                     {item.focusSkill.duration ?? '-'} 秒
                   </div>
                   <div className="ak-skill-desc">{item.focusSkill.description}</div>
+
+                  {item.skillLevels?.length ? (
+                    <div className="ak-level-tabs">
+                      {item.skillLevels.map((lv) => (
+                        <button
+                          key={lv.level}
+                          type="button"
+                          className={`ak-level-tab ${lv.level === item.focusSkill?.level ? 'active' : ''}`}
+                          onClick={() => {
+                            if (!item.operator || !item.focusSkill) return;
+                            const q = `${item.operator.name}的${item.focusSkill.skill_index}技能${
+                              lv.level <= 7 ? `${lv.level}级` : lv.level_label
+                            }`;
+                            void query(q);
+                          }}
+                        >
+                          {lv.level_label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
