@@ -1172,18 +1172,34 @@ body,
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  flex-wrap: wrap;
-  padding: 8px 10px;
+  flex-wrap: nowrap;
+  padding: 5px 10px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #ffffff;
 }
 
-.result-quick-actions > div {
+/* 只作用于左侧信息列，不要命中 antd Space 渲染出的 div */
+.result-quick-actions > div:first-child {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.result-quick-actions > div:first-child strong,
+.result-quick-actions > div:first-child span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 按钮组保持横向，不被压缩换行 */
+.result-quick-actions .ant-space {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
 }
 
 .result-quick-actions strong {
