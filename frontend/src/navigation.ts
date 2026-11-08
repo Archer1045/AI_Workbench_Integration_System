@@ -30,6 +30,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { key: 'gameAssistant', label: '游戏助手' },
       { key: 'mcAssistant', label: '我的世界' },
       { key: 'akAssistant', label: '明日方舟' },
+      { key: 'fgoAssistant', label: 'FGO' },
+      { key: 'hsrAssistant', label: '星穹铁道' },
     ],
   },
   {

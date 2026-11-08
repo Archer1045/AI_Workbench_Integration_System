@@ -25,6 +25,8 @@ import task_registry  # noqa: E402
 import task_resources  # noqa: E402
 from routers import chat, companion, draw, external_galleries as external_galleries_router, image_tools, preset_assets, prompt, prompt_sets, records, resources, services_router, settings_router, storyboard, train, video  # noqa: E402
 import ak_assistant  # noqa: E402
+import fgo_assistant  # noqa: E402
+import hsr_assistant  # noqa: E402
 import mc_assistant  # noqa: E402
 from game_assistant import account_router as game_assistant_account_router  # noqa: E402
 from game_assistant import combat_router as game_assistant_combat_router  # noqa: E402
@@ -109,6 +111,8 @@ app.include_router(external_galleries_router.router)
 app.include_router(storyboard.router)
 app.include_router(game_assistant_router.router)
 app.include_router(ak_assistant.router)
+app.include_router(fgo_assistant.router)
+app.include_router(hsr_assistant.router)
 app.include_router(mc_assistant.router)
 app.include_router(game_assistant_account_router.router)
 app.include_router(game_assistant_combat_router.router)

@@ -6,6 +6,8 @@ export type TabKey =
   | 'draw'
   | 'gameAssistant'
   | 'akAssistant'
+  | 'fgoAssistant'
+  | 'hsrAssistant'
   | 'mcAssistant'
   | 'prompt'
   | 'presetLibrary'
