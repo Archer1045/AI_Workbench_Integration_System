@@ -8,6 +8,7 @@ export type TabKey =
   | 'akAssistant'
   | 'fgoAssistant'
   | 'hsrAssistant'
+  | 'agentAssistant'
   | 'mcAssistant'
   | 'prompt'
   | 'presetLibrary'

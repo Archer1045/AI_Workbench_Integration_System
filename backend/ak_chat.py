@@ -78,9 +78,12 @@ def _find_operator(q: str) -> dict | None:
     for o in ops:
         if o["name_en"] and o["name_en"] in words:
             return o
-    # 再做子串兜底（长名优先）
+    # 再做子串兜底（长名优先）。
+    # 单字名（如「阿」）只在上面的分词精确匹配阶段算，
+    # 否则「阿尔托莉雅」会被单字「阿」误命中。
     for o in ops:
-        if o["name"] and o["name"] in q:
+        name = o["name"] or ""
+        if len(name) >= 2 and name in q:
             return o
     return None
 

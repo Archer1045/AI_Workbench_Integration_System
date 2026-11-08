@@ -25,6 +25,7 @@ const McPanel = lazy(() => import("./components/McPanel"));
 const AkPanel = lazy(() => import("./components/AkPanel"));
 const FgoPanel = lazy(() => import("./components/FgoPanel"));
 const HsrPanel = lazy(() => import("./components/HsrPanel"));
+const AgentPanel = lazy(() => import("./components/AgentPanel"));
 const VideoPanel = lazy(() => import("./components/VideoPanel"));
 const TrainPanel = lazy(() => import("./components/TrainPanel"));
 const PromptAgent = lazy(() => import("./components/PromptAgent"));
@@ -47,6 +48,7 @@ const PANELS: Record<TabKey, { label: string; render: () => JSX.Element }> = {
   akAssistant: { label: "明日方舟", render: () => <AkPanel /> },
   fgoAssistant: { label: "FGO", render: () => <FgoPanel /> },
   hsrAssistant: { label: "星穹铁道", render: () => <HsrPanel /> },
+  agentAssistant: { label: "总助手", render: () => <AgentPanel /> },
   video: { label: "AI 动画", render: () => <VideoPanel /> },
   train: { label: "LoRA 训练", render: () => <TrainPanel /> },
   prompt: { label: "提示词 Agent", render: () => <PromptAgent /> },
