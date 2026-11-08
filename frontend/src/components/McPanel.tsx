@@ -88,55 +88,118 @@ export default function McPanel() {
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', content: q }]);
     setLoading(true);
+
+    // 先占一条空消息，随后逐步填充
+    const placeholderIndex = { current: -1 };
+    setMessages((prev) => {
+      placeholderIndex.current = prev.length;
+      return [...prev, { role: 'assistant' as const, content: '' }];
+    });
+
+    const patchLast = (patch: Partial<Message>) => {
+      setMessages((prev) => {
+        const idx = placeholderIndex.current;
+        if (idx < 0 || idx >= prev.length) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...patch };
+        return next;
+      });
+    };
+
+    const appendText = (chunk: string) => {
+      setMessages((prev) => {
+        const idx = placeholderIndex.current;
+        if (idx < 0 || idx >= prev.length) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], content: (next[idx].content || '') + chunk };
+        return next;
+      });
+    };
+
     try {
-      // 走对话接口：后端做意图路由 + 数据组装 + LLM 润色
-      const r = await api.post('/mc/chat', { query: q });
-      const d = r.data;
+      const resp = await fetch('/api/mc/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
 
-      const entity = d.entity
-        ? {
-            id: d.entity.id,
-            name_zh: d.entity.name_zh,
-            name_en: d.entity.name_en,
-            icon_url: d.entity.icon_url,
-            first_version: d.entity.first_version,
-            last_version: null,
-            versions: [] as string[],
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let sep = buffer.indexOf('\n\n');
+        while (sep >= 0) {
+          const frame = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          sep = buffer.indexOf('\n\n');
+
+          for (const line of frame.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            let evt: any;
+            try {
+              evt = JSON.parse(line.slice(6));
+            } catch {
+              continue;
+            }
+            if (evt.type === 'meta') {
+              const entity = evt.entity
+                ? {
+                    id: evt.entity.id,
+                    name_zh: evt.entity.name_zh,
+                    name_en: evt.entity.name_en,
+                    icon_url: evt.entity.icon_url,
+                    first_version: evt.entity.first_version,
+                    last_version: null,
+                    versions: [] as string[],
+                  }
+                : undefined;
+
+              patchLast({
+                kind: evt.candidates?.length
+                  ? 'clarify'
+                  : evt.diff
+                    ? 'diff'
+                    : evt.recipes?.length
+                      ? 'recipe'
+                      : 'text',
+                entity,
+                recipes: evt.recipes || [],
+                materialIcons: evt.material_icons || {},
+                candidates: evt.candidates || [],
+                diff: evt.diff
+                  ? { from: evt.diff.from, to: evt.diff.to, count: evt.diff.total, items: evt.diff.items }
+                  : undefined,
+              });
+
+              if (entity) {
+                api
+                  .get(`/mc/entity/${encodeURIComponent(entity.id)}`)
+                  .then((detail) =>
+                    patchLast({
+                      entity: {
+                        ...entity,
+                        versions: detail.data.versions || [],
+                        last_version: detail.data.last_version,
+                      },
+                    }),
+                  )
+                  .catch(() => undefined);
+              }
+            } else if (evt.type === 'delta' && evt.content) {
+              appendText(evt.content);
+            } else if (evt.type === 'error') {
+              appendText(`\n[出错了：${evt.message}]`);
+            }
           }
-        : undefined;
-
-      // 版本列表单独补（对话接口不返回）
-      if (entity) {
-        try {
-          const detail = await api.get(`/mc/entity/${encodeURIComponent(entity.id)}`);
-          entity.versions = detail.data.versions || [];
-          entity.last_version = detail.data.last_version;
-        } catch {
-          /* 忽略 */
         }
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: d.text || '没有找到相关内容。',
-          kind: d.candidates?.length
-            ? 'clarify'
-            : d.diff
-              ? 'diff'
-              : d.recipes?.length
-                ? 'recipe'
-                : 'text',
-          entity,
-          recipes: d.recipes || [],
-          materialIcons: d.material_icons || {},
-          candidates: d.candidates || [],
-          diff: d.diff
-            ? { from: d.diff.from, to: d.diff.to, count: d.diff.total, items: d.diff.items }
-            : undefined,
-        },
-      ]);
     } catch (err) {
       message.error(`查询失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {

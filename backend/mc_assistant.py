@@ -11,8 +11,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 
+import llm
 import mc_chat
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 router = APIRouter()
 
@@ -344,3 +345,59 @@ class PlanRequest(BaseModel):
 def mc_plan(request: PlanRequest) -> dict:
     """生成发育路线规划图（Mermaid）。"""
     return mc_chat.build_plan(request.goal)
+
+# ── 流式对话（SSE） ──
+
+def _mc_sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+@router.post("/api/mc/chat/stream")
+def mc_chat_stream(request: ChatRequest):
+    """流式对话：先返回数据（meta），再逐字返回文字（delta）。"""
+    q = (request.query or "").strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="query 不能为空")
+
+    def generate():
+        try:
+            data, context = mc_chat.prepare(q)
+        except Exception as exc:
+            yield _mc_sse({"type": "error", "message": str(exc)[:200]})
+            return
+
+        meta = {k: v for k, v in data.items() if not k.startswith("_") and k != "text"}
+        yield _mc_sse({"type": "meta", **meta})
+
+        # clarify 或没有上下文：直接把 data 里的 text 发出去
+        if data.get("intent") == "clarify" or not context:
+            yield _mc_sse(
+                {"type": "delta", "content": data.get("text") or mc_chat._fallback_text(data.get("intent", ""), data)}
+            )
+            yield _mc_sse({"type": "done"})
+            return
+
+        if not llm.is_available():
+            yield _mc_sse(
+                {"type": "delta", "content": mc_chat._fallback_text(data.get("intent", ""), data)}
+            )
+            yield _mc_sse({"type": "done"})
+            return
+
+        try:
+            messages = mc_chat.build_messages(q, context)
+            for kind, chunk in llm.stream_chat(
+                messages, temperature=0.3, max_tokens=400, timeout=180
+            ):
+                if kind == "answer" and chunk:
+                    yield _mc_sse({"type": "delta", "content": chunk})
+        except Exception as exc:
+            yield _mc_sse({"type": "error", "message": str(exc)[:200]})
+
+        yield _mc_sse({"type": "done"})
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

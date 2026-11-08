@@ -388,7 +388,11 @@ SYSTEM_PROMPT = (
 )
 
 
-def answer(q: str) -> dict:
+def prepare(q: str) -> tuple[dict, str]:
+    """第一步：查数据、组装上下文。返回 (data, context)。
+
+    若需要澄清，data 里带 clarify 标记，context 为空。
+    """
     con = _conn()
     try:
         entities = _find_entities(q, con)
@@ -397,49 +401,69 @@ def answer(q: str) -> dict:
 
         # 需要澄清：直接把候选返回，不走 LLM
         if intent == "clarify":
-            con.close()
-            names = "、".join(
-                e["name_zh"] or e["name_en"] for e in entities[:6]
+            names = "、".join(e["name_zh"] or e["name_en"] for e in entities[:6])
+            return (
+                {
+                    "intent": "clarify",
+                    "query": q,
+                    "text": f"「{q}」在资料里对应多个条目：{names}。你想查哪一个？",
+                    "candidates": [
+                        {
+                            "id": e["id"],
+                            "name_zh": e["name_zh"],
+                            "name_en": e["name_en"],
+                            "type": e["type"],
+                            "icon_url": f"/api/mc/icon/{e['icon_file']}"
+                            if e.get("icon_file")
+                            else None,
+                        }
+                        for e in entities[:6]
+                    ],
+                },
+                "",
             )
-            return {
-                "intent": "clarify",
-                "query": q,
-                "text": f"「{q}」在资料里对应多个条目：{names}。你想查哪一个？",
-                "candidates": [
-                    {
-                        "id": e["id"],
-                        "name_zh": e["name_zh"],
-                        "name_en": e["name_en"],
-                        "type": e["type"],
-                        "icon_url": f"/api/mc/icon/{e['icon_file']}" if e.get("icon_file") else None,
-                    }
-                    for e in entities[:6]
-                ],
-            }
 
         context, data = _build_context(intent, q, con, entity)
+        data["query"] = q
+        return data, context
     finally:
         try:
             con.close()
         except Exception:
             pass
 
+
+def build_messages(q: str, context: str) -> list[dict]:
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": f"资料：\n{context}\n\n问题：{q}"},
+    ]
+
+
+def answer(q: str) -> dict:
+    """非流式：一次性返回完整回复。"""
+    data, context = prepare(q)
+
+    # clarify 分支已经带了 text
+    if data.get("intent") == "clarify":
+        return data
+
     text = ""
     if llm.is_available() and context:
         try:
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"资料：\n{context}\n\n问题：{q}"},
-            ]
-            text = llm.chat(messages, temperature=0.3, max_tokens=400, timeout=90, think=False).strip()
+            text = llm.chat(
+                build_messages(q, context),
+                temperature=0.3,
+                max_tokens=400,
+                timeout=90,
+                think=False,
+            ).strip()
         except Exception as exc:
             data["llm_error"] = str(exc)[:200]
     if not text:
-        # LLM 不可用时给规则回复
-        text = _fallback_text(intent, data)
+        text = _fallback_text(data["intent"], data)
 
     data["text"] = text
-    data["query"] = q
     return data
 
 
