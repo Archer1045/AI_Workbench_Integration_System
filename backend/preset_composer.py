@@ -12,6 +12,7 @@ import expansion_presets
 import pose_prompts
 import preset_registry
 import prompt_agent
+import prompt_budget
 import scene_presets
 import toy_presets
 
@@ -351,11 +352,21 @@ def compose_presets(payload: dict, *, restriction_enabled: bool = False) -> dict
             if overlap:
                 raise ComposeError(f"{preset['id']} 与以下预设冲突：{sorted(overlap)}")
 
-    raw_fragments: list[str] = []
+    # 按优先级收集片段：P0 必留，P1 尽量留，P2 可丢
+    tagged_fragments: list[tuple[int, str]] = []
+    if roles:
+        tagged_fragments.append(
+            (prompt_budget.P0, "character roles from left to right: " + ", ".join(roles))
+        )
     if pose:
-        raw_fragments.append(pose_prompts.pose_prompt(pose, "core"))
+        tagged_fragments.append((prompt_budget.P0, pose_prompts.pose_prompt(pose, "core")))
+    if pose and pose.get("body_separation"):
+        tagged_fragments.append((prompt_budget.P0, _BODY_SEPARATION_SUFFIX))
     if scene:
-        raw_fragments.append(_fragment(scene))
+        tagged_fragments.append((prompt_budget.P1, _fragment(scene)))
+
+    # 每个角色的第一件服装算 P1（保证每个角色都有衣着描述），其余算 P2
+    seen_scope: set[str] = set()
     for item in selected:
         fragment = _scoped_fragment(item["preset"], item["scope"])
         color_terms = [
@@ -365,13 +376,16 @@ def compose_presets(payload: dict, *, restriction_enabled: bool = False) -> dict
         ]
         if color_terms:
             fragment = f"{fragment}, {', '.join(color_terms)}"
-        raw_fragments.append(fragment)
-    if roles:
-        raw_fragments.insert(0, "character roles from left to right: " + ", ".join(roles))
-    if pose and pose.get("body_separation"):
-        raw_fragments.append(_BODY_SEPARATION_SUFFIX)
+        # 用原始 scope 字符串做 key（canonical 会把 角色A/角色B 都归一成 all）
+        scope_key = str(item["scope"]).strip().lower()
+        if scope_key not in seen_scope:
+            priority = prompt_budget.P1
+            seen_scope.add(scope_key)
+        else:
+            priority = prompt_budget.P2
+        tagged_fragments.append((priority, fragment))
 
-    prompt = ", ".join(_dedupe(raw_fragments))
+    prompt, dropped_tags = prompt_budget.trim_fragments(tagged_fragments)
     blocked_text = content_filter.is_hard_blocked(prompt)
     if blocked_text:
         raise ComposeError("组合内容命中永久禁止规则", status_code=403)
@@ -381,6 +395,9 @@ def compose_presets(payload: dict, *, restriction_enabled: bool = False) -> dict
     warnings: list[str] = []
     if rating == "R18":
         warnings.append("组合包含 R18 预设")
+    if dropped_tags:
+        warnings.append(f"提示词超出 CLIP 预算，已裁剪 {len(dropped_tags)} 个 tag")
+
     return {
         "prompt": prompt,
         "rating": rating,
@@ -388,6 +405,11 @@ def compose_presets(payload: dict, *, restriction_enabled: bool = False) -> dict
         "blocked": False,
         "used_ids": selected_ids,
         "roles": roles,
+        "budget": {
+            "estimated_tokens": prompt_budget.estimate_tokens(prompt),
+            "limit": prompt_budget.DEFAULT_BUDGET,
+            "dropped_tags": dropped_tags[:10],
+        },
         "items": {
             "pose_id": pose_id or None,
             "scene_id": scene_id or None,

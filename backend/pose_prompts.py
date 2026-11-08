@@ -124,6 +124,32 @@ def pose_people_prompt(preset: dict[str, Any]) -> str:
     return ""
 
 
+# 躺卧类姿势的关键词（用于追加取景约束，避免横向构图被裁切）
+_LYING_TAGS = {
+    "lying",
+    "lying back",
+    "lying down",
+    "lying on back",
+    "lying on side",
+    "lying on stomach",
+    "on back",
+    "on side",
+    "on stomach",
+    "prone",
+    "supine",
+    "face down",
+    "all fours",
+}
+# 卧姿取景约束：横向延展容易被裁，显式要求全身入画。
+# 注意不要写具体躺姿（lying on side 等），会和 pose 本身的仰躺/俯卧冲突。
+_LYING_FRAMING = "full body in frame, head and feet visible, horizontal composition"
+
+
+def _needs_lying_framing(tags: Iterable[str]) -> bool:
+    lowered = {str(tag).strip().casefold() for tag in tags}
+    return bool(lowered & _LYING_TAGS)
+
+
 def pose_prompt(preset: dict[str, Any], detail: str = "core") -> str:
     tags = (
         pose_core_tags(preset)
@@ -137,6 +163,9 @@ def pose_prompt(preset: dict[str, Any], detail: str = "core") -> str:
     body_parts = [", ".join(tags)]
     if detail == "full":
         body_parts.append(str(preset.get("draw_prompt") or "").strip())
+    # 卧姿追加取景约束（放在姿势之后、角色描述之前）
+    if _needs_lying_framing(tags):
+        body_parts.append(_LYING_FRAMING)
     body = ", ".join(part for part in body_parts if part)
     people = pose_people_prompt(preset)
     if not people:

@@ -328,10 +328,26 @@ SCENE_PRESET_DEFINITIONS = (
         "category": "居家日常",
         "label": "私密暖光浴间",
         "translation": "暖色灯光、浴缸、毛巾和湿润空气构成私人沐浴空间。",
-        "tags": ["private bath suite", "warm lighting", "bathtub", "towels", "steam"],
+        "tags": [
+            "private bath suite",
+            "warm lighting",
+            "bathtub",
+            "folded towels",
+            "soft steam",
+            "tiled wall",
+            "single room",
+        ],
         "rating": "R18", "intensity": "强化", "setting": "居家",
         "equipment": ["家具", "水景", "灯光"], "camera": "中景", "lighting": "柔光",
-        "draw_prompt": "an empty private warm-lit bath suite with a bathtub, folded towels and soft steam, no people",
+        "draw_prompt": (
+            "an empty private warm-lit bath suite with a single bathtub, folded towels on a rack "
+            "and soft steam, plain tiled wall behind, no people, "
+            "no mirror, no reflective surface, no glass panel, no window reflection, no water reflection"
+        ),
+        "negative_prompt": (
+            "mirror, reflection, reflective surface, glass panel, mirrored wall, "
+            "multiple rooms, duplicated bathtub"
+        ),
     },
     {
         "id": "scene_private_sauna_cabin",
