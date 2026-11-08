@@ -5,6 +5,7 @@ import re
 
 import scene_presets_20261102
 import scene_presets_20261105
+import scene_presets_20261108
 
 CATEGORIES = (
     "装置与陈设",
@@ -3071,3 +3072,28 @@ _EXTRA_DAILY_IDS = tuple(
     for item in scene_presets_20261105.SCENE_PRESET_DEFINITIONS
     if item["rating"] == "普通"
 )
+
+# 2026-11-08 场景扩展第三批（去重后只含 16 个新增）
+_EXISTING_SCENE_IDS_20261108 = {
+    str(item["id"]) for item in SCENE_PRESETS
+}
+for _scene_definition in scene_presets_20261108.SCENE_PRESET_DEFINITIONS:
+    _sid = str(_scene_definition["id"])
+    if _sid in _EXISTING_SCENE_IDS_20261108:
+        continue
+    SCENE_PRESETS.append(
+        _daily_scene(
+            _scene_definition["id"],
+            _scene_definition["category"],
+            _scene_definition["label"],
+            _scene_definition["translation"],
+            list(_scene_definition["tags"]),
+            rating=_scene_definition["rating"],
+            intensity=_scene_definition["intensity"],
+            setting=_scene_definition["setting"],
+            equipment=list(_scene_definition["equipment"]),
+            camera=_scene_definition["camera"],
+            lighting=_scene_definition["lighting"],
+            draw_prompt=_scene_definition["draw_prompt"],
+        )
+    )
