@@ -310,10 +310,19 @@ def _build_context(intent: str, q: str, con: sqlite3.Connection, entity: dict | 
                 )
 
     elif intent == "version_diff":
-        frm = _extract_version(q) or "1.7.10"
-        to = "1.21"
-        if frm == "1.21":
-            frm = "1.7.10"
+        # 语义区分：
+        #   「1.21 新增了什么」      -> 对比上一个版本（1.20 -> 1.21）
+        #   「1.7.10 到 1.21 加了什么」-> 对比这两个版本
+        all_versions = sorted(VERSIONS, key=lambda v: [int(x) for x in v.split(".")])
+        mentioned = [v for v in all_versions if v in q]
+        if len(mentioned) >= 2:
+            frm, to = mentioned[0], mentioned[-1]
+        elif len(mentioned) == 1:
+            to = mentioned[0]
+            idx = all_versions.index(to)
+            frm = all_versions[idx - 1] if idx > 0 else all_versions[0]
+        else:
+            frm, to = "1.7.10", "1.21"
         diff = _version_diff(con, frm, to)
         data["diff"] = diff
         lines.append(f"版本 {frm} → {to} 新增 {diff['total']} 个物品/方块")
@@ -440,6 +449,49 @@ def build_messages(q: str, context: str) -> list[dict]:
     ]
 
 
+def _recipe_text(data: dict) -> str:
+    """把配方数据渲染成固定格式的文本（不走 LLM，保证稳定）。"""
+    entity = data.get("entity") or {}
+    recipes = data.get("recipes") or []
+    if not recipes:
+        return ""
+
+    # 收集所有材料 id，统一转中文
+    all_ids: set[str] = set()
+    for r in recipes[:4]:
+        for row in r.get("shape") or []:
+            all_ids.update(m for m in row if m)
+        all_ids.update(m for m in (r.get("ingredients") or []) if m)
+
+    names: dict[str, str] = {}
+    con = _conn()
+    try:
+        names = _material_names(con, all_ids)
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
+
+    def zh(mid: str) -> str:
+        return names.get(mid, mid)
+
+    name = entity.get("name_zh") or entity.get("name_en") or "该物品"
+    lines = [f"「{name}」共有 {len(recipes)} 条配方："]
+
+    for r in recipes[:4]:
+        ver = r.get("version") or ""
+        if r.get("shape"):
+            grid = " / ".join(
+                " ".join(zh(m) if m else "空" for m in row) for row in r["shape"]
+            )
+            lines.append(f"[{ver}] 有序合成（逐行）：{grid} → 产出 {r.get('result_count')} 个")
+        elif r.get("ingredients"):
+            mats = "、".join(zh(m) for m in r["ingredients"] if m)
+            lines.append(f"[{ver}] 无序合成：{mats} → 产出 {r.get('result_count')} 个")
+    return "\n".join(lines)
+
+
 def answer(q: str) -> dict:
     """非流式：一次性返回完整回复。"""
     data, context = prepare(q)
@@ -447,6 +499,13 @@ def answer(q: str) -> dict:
     # clarify 分支已经带了 text
     if data.get("intent") == "clarify":
         return data
+
+    # recipe 用模板输出，保证答案稳定（不依赖 LLM 措辞）
+    if data.get("intent") == "recipe" and data.get("recipes"):
+        rendered = _recipe_text(data)
+        if rendered:
+            data["text"] = rendered
+            return data
 
     text = ""
     if llm.is_available() and context:

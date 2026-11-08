@@ -313,6 +313,12 @@ def fallback_text(context: str) -> str:
 def answer(q: str) -> dict:
     """非流式：一次性返回完整回复。"""
     data, context = prepare(q)
+
+    # 列表查询直接返回整理好的文本，不让 LLM 自由发挥
+    if data.get("intent") == "list" and context:
+        data["text"] = context
+        return data
+
     text = ""
     if llm.is_available() and context:
         try:
