@@ -22,6 +22,7 @@ import { NAV_GROUPS } from "./navigation";
 const AIDrawingWorkspace = lazy(() => import("./components/AIDrawingWorkspace"));
 const GameAssistantPanel = lazy(() => import("./components/GameAssistantPanel"));
 const McPanel = lazy(() => import("./components/McPanel"));
+const AkPanel = lazy(() => import("./components/AkPanel"));
 const VideoPanel = lazy(() => import("./components/VideoPanel"));
 const TrainPanel = lazy(() => import("./components/TrainPanel"));
 const PromptAgent = lazy(() => import("./components/PromptAgent"));
@@ -41,6 +42,7 @@ const PANELS: Record<TabKey, { label: string; render: () => JSX.Element }> = {
   draw: { label: "AI 绘画", render: () => <AIDrawingWorkspace /> },
   gameAssistant: { label: "游戏助手", render: () => <GameAssistantPanel /> },
   mcAssistant: { label: "我的世界", render: () => <McPanel /> },
+  akAssistant: { label: "明日方舟", render: () => <AkPanel /> },
   video: { label: "AI 动画", render: () => <VideoPanel /> },
   train: { label: "LoRA 训练", render: () => <TrainPanel /> },
   prompt: { label: "提示词 Agent", render: () => <PromptAgent /> },

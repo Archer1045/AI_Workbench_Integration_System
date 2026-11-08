@@ -29,6 +29,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { key: 'gameAssistant', label: '游戏助手' },
       { key: 'mcAssistant', label: '我的世界' },
+      { key: 'akAssistant', label: '明日方舟' },
     ],
   },
   {

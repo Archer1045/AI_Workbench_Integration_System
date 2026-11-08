@@ -5,6 +5,7 @@ export type TabKey =
   | 'agent'
   | 'draw'
   | 'gameAssistant'
+  | 'akAssistant'
   | 'mcAssistant'
   | 'prompt'
   | 'presetLibrary'
