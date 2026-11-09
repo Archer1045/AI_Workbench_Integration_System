@@ -364,6 +364,15 @@ def compose_presets(payload: dict, *, restriction_enabled: bool = False) -> dict
         tagged_fragments.append((prompt_budget.P0, _BODY_SEPARATION_SUFFIX))
     if scene:
         tagged_fragments.append((prompt_budget.P1, _fragment(scene)))
+        # 按场景的路人密度追加人群描述（2026-11-09）
+        density = str(scene.get("pc_density") or "optional")
+        if density == "required":
+            tagged_fragments.append(
+                (prompt_budget.P2, "background characters, crowd in the distance, depth of field")
+            )
+        elif density == "none":
+            # 私人场景：明确不要路人
+            tagged_fragments.append((prompt_budget.P2, "empty surroundings, no other people"))
 
     # 每个角色的第一件服装算 P1（保证每个角色都有衣着描述），其余算 P2
     seen_scope: set[str] = set()

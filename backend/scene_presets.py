@@ -7,6 +7,40 @@ import scene_presets_20261102
 import scene_presets_20261105
 import scene_presets_20261108
 
+# 路人 NPC 密度档位（用户 2026-11-06 定义）
+PC_DENSITY_LEVELS = ("none", "optional", "required")
+
+# 分类 -> 默认密度
+CATEGORY_PC_DENSITY = {
+    "居家日常": "none",
+    "装置与陈设": "none",
+    "自然景观": "none",
+    "废墟遗迹": "none",
+    "城市日常": "optional",
+    "特色空间": "optional",
+    "社交活动": "optional",
+    "休闲娱乐": "optional",
+    "旅行季节": "optional",
+    "校园职场": "optional",
+    "天气": "none",
+    "玄幻": "none",
+    "科幻": "none",
+}
+
+# 关键词 -> 强制 required（公共场景，即使分类是 optional）
+PC_DENSITY_REQUIRED_WORDS = (
+    "集市", "市场", "广场", "步行街", "商业街", "车站", "地铁", "机场",
+    "商场", "百货", "食堂", "餐厅", "咖啡馆", "酒吧", "夜市", "庙会",
+    "祭典", "演唱会", "漫展", "球场", "看台", "公园", "游乐园",
+    "办公室", "教室", "医院", "图书馆", "澡堂", "温泉",
+)
+
+# 关键词 -> 强制 none（私人/无人场景）
+PC_DENSITY_NONE_WORDS = (
+    "卧室", "床", "浴室", "淋浴", "浴缸", "私密", "独处", "空房",
+    "废墟", "遗迹", "荒野", "森林", "沙漠", "洞穴", "山顶", "海底",
+)
+
 CATEGORIES = (
     "装置与陈设",
     "自然景观",
@@ -3097,3 +3131,32 @@ for _scene_definition in scene_presets_20261108.SCENE_PRESET_DEFINITIONS:
             draw_prompt=_scene_definition["draw_prompt"],
         )
     )
+
+# ── 批量打 pc_density 标签（2026-11-09） ──
+
+def _infer_pc_density(scene: dict) -> str:
+    """按分类和关键词推断路人密度。"""
+    label = str(scene.get("label") or "")
+    translation = str(scene.get("translation") or "")
+    text_blob = label + " " + translation
+
+    # 关键词优先：私人/无人
+    for word in PC_DENSITY_NONE_WORDS:
+        if word in text_blob:
+            return "none"
+    # 关键词优先：公共
+    for word in PC_DENSITY_REQUIRED_WORDS:
+        if word in text_blob:
+            return "required"
+
+    category = str(scene.get("category") or "")
+    return CATEGORY_PC_DENSITY.get(category, "optional")
+
+
+_apply_pc_density = 0
+for _scene in SCENE_PRESETS:
+    if _scene.get("pc_density"):
+        continue
+    _scene["pc_density"] = _infer_pc_density(_scene)
+    _apply_pc_density += 1
+
