@@ -231,24 +231,38 @@ def ak_stage(
 def ak_operators(
     profession: str | None = Query(None, description="职业中文名，如「近卫」"),
     rarity: int | None = Query(None, ge=1, le=6),
+    nation: str | None = Query(None, description="阵营中文名，如「罗德岛」"),
+    position: str | None = Query(None, description="近战 / 远程"),
     limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict:
-    """按职业/星级列出干员。"""
+    """按职业/星级/阵营/站位列出干员。"""
     con = _conn()
-    sql = "select id, name, rarity, profession_zh, nation_zh from operator where 1=1"
+    where = " where 1=1"
     params: list = []
     if profession:
-        sql += " and profession_zh = ?"
+        where += " and profession_zh = ?"
         params.append(profession)
     if rarity:
-        sql += " and rarity = ?"
+        where += " and rarity = ?"
         params.append(rarity)
-    sql += " order by rarity desc, name limit ?"
-    params.append(limit)
-    rows = con.execute(sql, params).fetchall()
+    if nation:
+        where += " and nation_zh = ?"
+        params.append(nation)
+    if position:
+        where += " and position = ?"
+        params.append("RANGED" if position == "远程" else "MELEE")
+
+    total = con.execute(f"select count(*) from operator{where}", params).fetchone()[0]
+
+    sql = f"select id, name, rarity, profession_zh, nation_zh, position from operator{where}"
+    sql += " order by rarity desc, name limit ? offset ?"
+    rows = con.execute(sql, [*params, limit, offset]).fetchall()
     con.close()
     return {
-        "total": len(rows),
+        "total": total,
+        "returned": len(rows),
+        "offset": offset,
         "operators": [
             {
                 "id": r["id"],
@@ -256,10 +270,48 @@ def ak_operators(
                 "rarity": r["rarity"],
                 "profession": r["profession_zh"],
                 "nation": r["nation_zh"],
+                "position": "远程" if r["position"] == "RANGED" else "近战",
                 "avatar": f"/api/ak/avatar/{r['name']}",
             }
             for r in rows
         ],
+    }
+
+
+@router.get("/api/ak/filters")
+def ak_filters() -> dict:
+    """筛选项：职业、阵营、站位，以及各组合的数量。"""
+    con = _conn()
+    professions = [
+        {"name": r["profession_zh"], "count": r["n"]}
+        for r in con.execute(
+            "select profession_zh, count(*) as n from operator"
+            " where profession_zh != '' group by profession_zh order by n desc"
+        )
+    ]
+    nations = [
+        {"name": r["nation_zh"], "count": r["n"]}
+        for r in con.execute(
+            "select nation_zh, count(*) as n from operator"
+            " where nation_zh != '' group by nation_zh order by n desc"
+        )
+    ]
+    rarities = [
+        {"value": r["rarity"], "count": r["n"]}
+        for r in con.execute(
+            "select rarity, count(*) as n from operator group by rarity order by rarity desc"
+        )
+    ]
+    positions = [
+        {"name": "远程" if r["position"] == "RANGED" else "近战", "count": r["n"]}
+        for r in con.execute("select position, count(*) as n from operator group by position")
+    ]
+    con.close()
+    return {
+        "professions": professions,
+        "nations": nations,
+        "rarities": rarities,
+        "positions": positions,
     }
 
 # ── 对话问答 ──
