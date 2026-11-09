@@ -32,6 +32,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { key: 'akAssistant', label: '明日方舟' },
       { key: 'fgoAssistant', label: 'FGO' },
       { key: 'hsrAssistant', label: '星穹铁道' },
+      { key: 'azurAssistant', label: '碧蓝航线' },
     ],
   },
   {
