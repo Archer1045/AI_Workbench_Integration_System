@@ -54,22 +54,30 @@ def _find_ships(q: str) -> list[dict]:
     ships = _load_ships()
     words = set(jieba.lcut(q))
 
+    # 1. 分词精确命中（最可靠）
     hits = [s for s in ships if s["name"] and s["name"] in words]
-    if not hits:
-        hits = [s for s in ships if s["name"] and s["name"] in q]
-    if not hits:
-        # 简称：问句里的词是舰船名的子串
-        candidates = [w for w in words if len(w) >= 2 and not w.isdigit()]
-        for s in ships:
-            name = s["name"] or ""
-            if not name:
-                continue
-            for w in candidates:
-                if w in name:
-                    hits.append(s)
-                    break
+    if hits:
+        hits.sort(key=lambda s: (-s["star"], len(s["name"] or "")))
+        return hits[:6]
 
-    # 星级高的优先
+    # 2. 问句包含完整舰船名
+    hits = [s for s in ships if s["name"] and s["name"] in q]
+    if hits:
+        hits.sort(key=lambda s: (-s["star"], len(s["name"] or "")))
+        return hits[:6]
+
+    # 3. 子串兜底：要求词长度 >= 3，避免「莉雅」这类 2 字碎片误命中
+    #    （「阿尔托莉雅」会被 jieba 拆出「莉雅」，而碧蓝有「贝莉雅」）
+    candidates = [w for w in words if len(w) >= 3 and not w.isdigit()]
+    for s in ships:
+        name = s["name"] or ""
+        if not name:
+            continue
+        for w in candidates:
+            if w in name:
+                hits.append(s)
+                break
+
     hits.sort(key=lambda s: (-s["star"], len(s["name"] or "")))
     return hits[:6]
 

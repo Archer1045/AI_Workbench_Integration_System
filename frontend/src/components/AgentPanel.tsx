@@ -22,6 +22,7 @@ const EXAMPLES = [
   '银灰的天赋是什么',
   '阿尔托莉雅的技能',
   '三月七的技能',
+  '企业的属性',
   '达妮娅的瞳色是什么',
 ];
 
@@ -30,6 +31,7 @@ const CAPABILITY_COLORS: Record<string, string> = {
   'game:arknights': 'blue',
   'game:fgo': 'gold',
   'game:hsr': 'purple',
+  'game:azur': 'geekblue',
   prompt: 'cyan',
 };
 

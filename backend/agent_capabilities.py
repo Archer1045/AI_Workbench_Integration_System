@@ -220,6 +220,7 @@ def _mc_detect(query: str) -> bool:
 def build_capabilities() -> list[Any]:
     """构造全部能力包。"""
     import ak_chat
+    import azur_chat
     import fgo_chat
     import hsr_chat
     import mc_chat
@@ -252,6 +253,29 @@ def build_capabilities() -> list[Any]:
             ("星穹铁道", "崩铁", "星铁", "honkai star rail", "星穹"),
             hsr_chat,
             hsr_chat._find_chars,
+        ),
+        GameCapability(
+            "game:azur",
+            "碧蓝航线",
+            (
+                "碧蓝航线",
+                "碧蓝",
+                "azur lane",
+                "舰b",
+                "舰B",
+                # 舰种词：没提游戏名也能识别
+                "航母",
+                "战列",
+                "战巡",
+                "驱逐",
+                "轻巡",
+                "重巡",
+                "潜艇",
+                "舰船",
+                "舰娘",
+            ),
+            azur_chat,
+            azur_chat._find_ships,
         ),
         PromptCapability(),
     ]

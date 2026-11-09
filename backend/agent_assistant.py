@@ -113,6 +113,7 @@ def agent_chat_stream(request: AgentChatRequest):
             "game:arknights": "/api/ak/chat/stream",
             "game:fgo": "/api/fgo/chat/stream",
             "game:hsr": "/api/hsr/chat/stream",
+            "game:azur": "/api/azur/chat/stream",
         }.get(cap_id)
 
         if stream_path:
