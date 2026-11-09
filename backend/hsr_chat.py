@@ -132,6 +132,51 @@ def _char_payload(con: sqlite3.Connection, cid: str) -> dict:
     }
 
 
+# 星神与重要 NPC（不是可培养角色，查不到数据是正常的）
+AEONS_AND_NPCS = {
+    # 星神
+    "纳努克": "毁灭星神",
+    "克里珀": "存护星神",
+    "博识尊": "智识星神",
+    "IX": "虚无星神",
+    "岚": "巡猎星神",
+    "药师": "丰饶星神",
+    "奥罗巴斯": "神秘星神",
+    "倏忽": "纯美星神",
+    "阿基维利": "开拓星神",
+    "塔伊兹育罗斯": "繁育星神",
+    "末王": "终末星神",
+    "互": "均衡星神",
+    # 重要 NPC
+    "可可娜": "黑塔空间站 NPC",
+    "三月七的相机": "物品",
+}
+
+
+# 即将实装的星神（实装后从 AEONS_AND_NPCS 移除，补进角色数据）
+UPCOMING_CHARACTERS = {
+    "阿哈": ("欢愉星神", "2026-11-11"),
+}
+
+
+def _aeon_hint(q: str) -> str:
+    """检查问句里有没有星神/NPC 名，返回提示。"""
+    # 先查即将实装的
+    for name, (kind, date) in UPCOMING_CHARACTERS.items():
+        if name in q and len(name) >= 2:
+            return (
+                f"「{name}」是{kind}，将于 **{date}** 实装为可操作角色。\n"
+                f"资料库目前还没有它的养成数据，实装后我会补上。"
+            )
+    for name, kind in AEONS_AND_NPCS.items():
+        if name in q and len(name) >= 2:
+            return (
+                f"「{name}」是{kind}，不是可培养角色，所以资料库里没有它的养成素材。\n"
+                f"可培养角色指的是能上阵、能升级、能升星的角色。"
+            )
+    return ""
+
+
 SYSTEM_PROMPT = (
     "你是「崩坏：星穹铁道」助手。用户会问角色属性、技能、星魂、晋阶材料等问题。\n"
     "规则：\n"
@@ -261,8 +306,13 @@ def build_messages(q: str, context: str) -> list[dict]:
     ]
 
 
-def fallback_text(context: str) -> str:
-    return context or "资料里没有找到相关内容。可以试试角色名，比如「三月七」「希儿」。"
+def fallback_text(context: str, q: str = "") -> str:
+    if context:
+        return context
+    hint = _aeon_hint(q)
+    if hint:
+        return hint
+    return "资料里没有找到相关内容。可以试试角色名，比如「三月七」「希儿」「开拓者·毁灭」。"
 
 
 def answer(q: str) -> dict:
@@ -283,5 +333,5 @@ def answer(q: str) -> dict:
             ).strip()
         except Exception as exc:
             data["llm_error"] = str(exc)[:200]
-    data["text"] = text or fallback_text(context)
+    data["text"] = text or fallback_text(context, q)
     return data
