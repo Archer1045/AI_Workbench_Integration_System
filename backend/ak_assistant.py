@@ -103,6 +103,31 @@ def ak_operator(name: str) -> dict:
             (op_id,),
         )
     ]
+
+    # 材料清单（2026-11-09 补）
+    KIND_LABELS = {"evolve": "精英化", "skill": "技能升级", "mastery": "专精"}
+    grouped: dict[str, dict[int, list[dict]]] = {}
+    for r in con.execute(
+        "select kind, stage, item_name, count from operator_material"
+        " where operator_id = ? order by kind, stage",
+        (op_id,),
+    ):
+        grouped.setdefault(r["kind"], {}).setdefault(r["stage"], []).append(
+            {"name": r["item_name"], "count": r["count"]}
+        )
+    materials = [
+        {
+            "kind": kind,
+            "label": KIND_LABELS.get(kind, kind),
+            "stages": [
+                {"stage": stage, "materials": mats}
+                for stage, mats in sorted(stages.items())
+            ],
+        }
+        for kind, stages in grouped.items()
+        if stages
+    ]
+
     con.close()
 
     return {
@@ -129,6 +154,7 @@ def ak_operator(name: str) -> dict:
             "atk_interval": op["atk_interval"],
         },
         "skills": skills,
+        "materials": materials,
         "talents": talents,
     }
 
@@ -310,3 +336,71 @@ def ak_chat_stream(request: AkChatRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+# ── 材料清单（2026-11-09） ──
+
+KIND_LABELS = {
+    "evolve": "精英化",
+    "skill": "技能升级",
+    "mastery": "专精",
+}
+
+
+@router.get("/api/ak/materials/{name}")
+def ak_materials(name: str) -> dict:
+    """查干员的材料清单：精英化 + 技能升级 + 专精。"""
+    con = _conn()
+    try:
+        row = con.execute(
+            "select id, name, rarity, profession_zh from operator where name = ? or id = ? limit 1",
+            (name, name),
+        ).fetchone()
+        if not row:
+            row = con.execute(
+                "select id, name, rarity, profession_zh from operator where name like ? limit 1",
+                (f"%{name}%",),
+            ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"干员不存在: {name}")
+
+        op_id = row["id"]
+        records = con.execute(
+            "select kind, stage, item_id, item_name, count from operator_material"
+            " where operator_id = ? order by kind, stage",
+            (op_id,),
+        ).fetchall()
+    finally:
+        con.close()
+
+    # 按类型分组
+    grouped: dict[str, dict[int, list[dict]]] = {}
+    for r in records:
+        kind = r["kind"]
+        stage = r["stage"]
+        grouped.setdefault(kind, {}).setdefault(stage, []).append(
+            {"id": r["item_id"], "name": r["item_name"], "count": r["count"]}
+        )
+
+    sections = []
+    for kind in ("evolve", "skill", "mastery"):
+        stages = grouped.get(kind) or {}
+        if not stages:
+            continue
+        sections.append(
+            {
+                "kind": kind,
+                "label": KIND_LABELS.get(kind, kind),
+                "stages": [
+                    {"stage": s, "materials": stages[s]}
+                    for s in sorted(stages)
+                ],
+            }
+        )
+
+    return {
+        "id": op_id,
+        "name": row["name"],
+        "rarity": row["rarity"],
+        "profession": row["profession_zh"],
+        "sections": sections,
+    }

@@ -153,6 +153,31 @@ def _op_payload(con: sqlite3.Connection, op: dict) -> dict:
             (op["id"],),
         )
     ]
+
+    # 材料清单（2026-11-09 补）
+    kind_labels = {"evolve": "精英化", "skill": "技能升级", "mastery": "专精"}
+    grouped: dict[str, dict[int, list[dict]]] = {}
+    for r in con.execute(
+        "select kind, stage, item_name, count from operator_material"
+        " where operator_id = ? order by kind, stage",
+        (op["id"],),
+    ):
+        grouped.setdefault(r["kind"], {}).setdefault(r["stage"], []).append(
+            {"name": r["item_name"], "count": r["count"]}
+        )
+    materials = [
+        {
+            "kind": kind,
+            "label": kind_labels.get(kind, kind),
+            "stages": [
+                {"stage": stage, "materials": mats}
+                for stage, mats in sorted(stages.items())
+            ],
+        }
+        for kind, stages in grouped.items()
+        if stages
+    ]
+
     return {
         "id": row["id"],
         "name": row["name"],
@@ -173,6 +198,7 @@ def _op_payload(con: sqlite3.Connection, op: dict) -> dict:
             "block": row["block"],
         },
         "talents": talents,
+        "materials": materials,
     }
 
 
@@ -268,7 +294,14 @@ def prepare(q: str) -> tuple[dict, str]:
             payload = _op_payload(con, op)
             data["operator"] = payload
             lines.append(f"干员：{op['name']}，{op['rarity']} 星 {op['profession_zh']}")
-            lines.append(f"资料里暂时没有{op['name']}的升级材料清单，只有基础属性和技能。")
+            # 材料清单（2026-11-09 补）
+            for sec in payload.get("materials") or []:
+                for st in sec["stages"]:
+                    mats = "、".join(f"{m['name']}x{m['count']}" for m in st["materials"])
+                    stage_label = (
+                        f"精{st['stage']}" if sec["kind"] == "evolve" else f"Lv{st['stage']}"
+                    )
+                    lines.append(f"{sec['label']} {stage_label}：{mats}")
         elif op:
             payload = _op_payload(con, op)
             data["operator"] = payload

@@ -28,6 +28,7 @@ type Operator = {
   };
   skills: { skill_id: string; skill_index: number }[];
   talents: { talent_index: number; name: string; description: string; unlock_phase: string }[];
+  materials?: MaterialSection[];
 };
 
 type Skill = {
@@ -49,6 +50,23 @@ type SkillLevel = {
   init_sp: number | null;
   duration: number | null;
   description: string;
+};
+
+type Material = {
+  id: string;
+  name: string;
+  count: number;
+};
+
+type MaterialStage = {
+  stage: number;
+  materials: Material[];
+};
+
+type MaterialSection = {
+  kind: string;
+  label: string;
+  stages: MaterialStage[];
 };
 
 type OperatorBrief = {
@@ -300,6 +318,23 @@ export default function AkPanel() {
                         <div key={ti} className="ak-talent">
                           <b>{t.name}</b>
                           <span>{t.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {item.operator.materials?.length ? (
+                    <div className="ak-talents">
+                      <span className="ak-label">材料</span>
+                      {item.operator.materials.map((sec) => (
+                        <div key={sec.kind} className="ak-talent">
+                          <b>{sec.label}</b>
+                          {sec.stages.map((st) => (
+                            <span key={st.stage} style={{ display: 'block' }}>
+                              {sec.kind === 'evolve' ? `精${st.stage}` : `Lv${st.stage}`}：
+                              {st.materials.map((m) => `${m.name}×${m.count}`).join('、')}
+                            </span>
+                          ))}
                         </div>
                       ))}
                     </div>
