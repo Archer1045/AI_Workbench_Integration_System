@@ -65,6 +65,24 @@ def _find_chars(q: str) -> list[dict]:
                     hits.append(c)
                     seen.add(c["id"])
                     break
+    if not hits:
+        # 兜底：问句里直接含角色名前缀（处理「开拓者·欢愉」被 jieba 拆开的情况）
+        # 以及对「开拓者」这种简称，返回全部命途
+        for c in chars:
+            name = c["name"] or ""
+            if not name:
+                continue
+            base = name.split("·")[0]
+            if base and len(base) >= 2 and base in q:
+                hits.append(c)
+        # 去重
+        seen2 = set()
+        uniq = []
+        for c in hits:
+            if c["id"] not in seen2:
+                seen2.add(c["id"])
+                uniq.append(c)
+        hits = uniq
 
     # 星级高的优先
     hits.sort(key=lambda c: (-c["rarity"], len(c["name"] or "")))
@@ -209,6 +227,13 @@ def prepare(q: str) -> tuple[dict, str]:
                     {"id": c["id"], "name": c["name"], "path": c["path_zh"], "rarity": c["rarity"]}
                     for c in chars
                 ]
+                # 把候选写进 context，避免 LLM 看不到
+                cand_desc = "、".join(
+                    f"{c['name']}（{c['path_zh']}，{c['element_zh']}，{c['rarity']} 星）"
+                    for c in chars
+                )
+                lines.append(f"同名或同前缀的角色有 {len(chars)} 个：{cand_desc}")
+                lines.append("如果用户问的是「有哪些命途/版本」，直接把这些列出来回答。")
 
             lines.append(
                 f"角色：{payload['name']}，{payload['path']}，{payload['element']}，{payload['rarity']} 星"
@@ -262,6 +287,9 @@ def _handle_list(con: sqlite3.Connection, q: str) -> tuple[str, dict]:
             path_key = en
             break
 
+    # 「最新」：按 id 倒序取最后一个（id 越大越新）
+    is_latest = any(w in q for w in ("最新", "最近", "新出", "刚出"))
+
     sql = "select id, name, path_zh, element_zh, rarity from character where 1=1"
     params: list = []
     if rarity is not None:
@@ -270,7 +298,14 @@ def _handle_list(con: sqlite3.Connection, q: str) -> tuple[str, dict]:
     if path_key:
         sql += " and path = ?"
         params.append(path_key)
-    sql += " order by name limit 30"
+
+    if is_latest:
+        # id 是字符串，转整数排（CAST）
+        sql += " order by cast(id as integer) desc limit 1"
+    else:
+        # 默认按 id 倒序（新的在前），不限制条数
+        sql += " order by cast(id as integer) desc"
+
     rows = con.execute(sql, params).fetchall()
 
     label_parts = []
@@ -280,10 +315,33 @@ def _handle_list(con: sqlite3.Connection, q: str) -> tuple[str, dict]:
         label_parts.append(path_key)
     label = "".join(label_parts) or "角色"
 
+    if is_latest and rows:
+        r = rows[0]
+        return (
+            f"资料库中 id 最大（最新）的角色是「{r['name']}」"
+            f"（{r['path_zh']}，{r['element_zh']}，{r['rarity']} 星，id={r['id']}）。\n"
+            f"注意：数据里没有放出的具体日期，这里按内部 id 判断新旧。",
+            {
+                "list_label": "最新角色",
+                "characters": [
+                    {
+                        "id": r["id"],
+                        "name": r["name"],
+                        "path": r["path_zh"],
+                        "element": r["element_zh"],
+                        "rarity": r["rarity"],
+                    }
+                ],
+            },
+        )
+
+    total = len(rows)
+    preview = 15 if total > 15 else total
     return (
-        f"{label}共 {len(rows)} 个：{'、'.join(r['name'] for r in rows[:15])}",
+        f"{label}共 {total} 个（按 id 从新到旧）：{'、'.join(r['name'] for r in rows[:preview])}",
         {
             "list_label": label,
+            "total": total,
             "characters": [
                 {
                     "id": r["id"],
