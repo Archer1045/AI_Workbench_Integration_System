@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -455,4 +456,192 @@ def ak_materials(name: str) -> dict:
         "rarity": row["rarity"],
         "profession": row["profession_zh"],
         "sections": sections,
+    }
+
+# ── 掉落查询（2026-11-09，数据源：企鹅物流） ──
+
+
+@router.get("/api/ak/drops/{item_name}")
+def ak_drops(item_name: str, limit: int = Query(20, ge=1, le=100)) -> dict:
+    """查材料在哪些关卡掉落，按每理智收益排序。
+
+    注意：`drop_rate` 是「每次通关的期望掉落数量」（可能 > 1），
+    `per_ap` 才是刷图效率指标（每 1 理智能换多少材料）。
+    """
+    con = _conn()
+    try:
+        # 先按名字找物品 id
+        rows = con.execute(
+            "select distinct item_id, item_name from drop_rate where item_name like ? limit 5",
+            (f"%{item_name}%",),
+        ).fetchall()
+        if not rows:
+            raise HTTPException(status_code=404, detail=f"没有掉落数据: {item_name}")
+
+        # 精确匹配优先
+        exact = [r for r in rows if r["item_name"] == item_name]
+        target = exact[0] if exact else rows[0]
+        item_id = target["item_id"]
+        resolved_name = target["item_name"]
+
+        drops = con.execute(
+            "select stage_code, zone_name, ap_cost, quantity, times, drop_rate, per_ap"
+            " from drop_rate where item_id = ? and per_ap is not null"
+            " order by per_ap desc limit ?",
+            (item_id, limit),
+        ).fetchall()
+
+        total_stages = con.execute(
+            "select count(*) from drop_rate where item_id = ? and per_ap is not null",
+            (item_id,),
+        ).fetchone()[0]
+    finally:
+        con.close()
+
+    return {
+        "item_id": item_id,
+        "item_name": resolved_name,
+        "total_stages": total_stages,
+        "drops": [
+            {
+                "stage": r["stage_code"],
+                "zone": r["zone_name"],
+                "ap_cost": r["ap_cost"],
+                "expected": round(r["drop_rate"], 3),
+                "per_ap": round(r["per_ap"], 4),
+                "samples": r["times"],
+            }
+            for r in drops
+        ],
+    }
+
+
+@router.get("/api/ak/drops")
+def ak_drops_search(q: str = Query("", description="材料名关键词")) -> dict:
+    """搜有掉落数据的材料。"""
+    con = _conn()
+    try:
+        if q:
+            rows = con.execute(
+                "select item_id, item_name, count(*) as n, max(per_ap) as best"
+                " from drop_rate where item_name like ? and per_ap is not null"
+                " group by item_id order by n desc limit 30",
+                (f"%{q}%",),
+            ).fetchall()
+        else:
+            rows = con.execute(
+                "select item_id, item_name, count(*) as n, max(per_ap) as best"
+                " from drop_rate where per_ap is not null"
+                " group by item_id order by n desc limit 30"
+            ).fetchall()
+    finally:
+        con.close()
+
+    return {
+        "query": q,
+        "items": [
+            {
+                "id": r["item_id"],
+                "name": r["item_name"],
+                "stages": r["n"],
+                "best_per_ap": round(r["best"], 4) if r["best"] else None,
+            }
+            for r in rows
+        ],
+    }
+
+# ── 活动查询（2026-11-09） ──
+
+ACT_PATTERN = re.compile(r"act(\d+)")
+
+
+def _act_number(zone_id: str) -> int:
+    m = ACT_PATTERN.search(zone_id or "")
+    return int(m.group(1)) if m else -1
+
+
+@router.get("/api/ak/activities")
+def ak_activities(limit: int = Query(20, ge=1, le=200)) -> dict:
+    """列出活动，按 act 编号从新到旧。
+
+    注意：企鹅物流只保留当前可刷的关卡，所以只有最近的活动有掉落数据。
+    """
+    con = _conn()
+    try:
+        rows = con.execute(
+            "select zone_id, zone_name, zone_type, stage_count, drop_count"
+            " from zone where zone_type in ('ACTIVITY', 'ACTIVITY_PERMANENT')"
+        ).fetchall()
+    finally:
+        con.close()
+
+    items = [
+        {
+            "zone_id": r["zone_id"],
+            "name": r["zone_name"],
+            "type": r["zone_type"],
+            "act_number": _act_number(r["zone_id"]),
+            "stages": r["stage_count"],
+            "drops": r["drop_count"],
+            "has_data": r["drop_count"] > 0,
+        }
+        for r in rows
+    ]
+    items.sort(key=lambda x: (-x["act_number"], -x["drops"]))
+    return {"total": len(items), "activities": items[:limit]}
+
+
+@router.get("/api/ak/activities/{name}")
+def ak_activity_detail(name: str) -> dict:
+    """查单个活动的关卡和掉落。"""
+    con = _conn()
+    try:
+        # 模糊匹配 zone_name
+        row = con.execute(
+            "select zone_id, zone_name, zone_type, stage_count, drop_count from zone"
+            " where zone_name = ? or zone_name like ? order by drop_count desc limit 1",
+            (name, f"%{name}%"),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"活动不存在: {name}")
+
+        zid = row["zone_id"]
+        stages = [
+            {
+                "stage_id": s["stage_id"],
+                "code": s["stage_code"],
+                "ap_cost": s["ap_cost"],
+            }
+            for s in con.execute(
+                "select stage_id, stage_code, ap_cost from stage_info where zone_id = ?",
+                (zid,),
+            )
+        ]
+
+        drops = [
+            {
+                "item": d["item_name"],
+                "stage": d["stage_code"],
+                "ap_cost": d["ap_cost"],
+                "expected": round(d["drop_rate"], 3),
+                "per_ap": round(d["per_ap"], 4),
+                "samples": d["times"],
+            }
+            for d in con.execute(
+                "select item_name, stage_code, ap_cost, drop_rate, per_ap, times"
+                " from drop_rate where zone_id = ? and per_ap is not null"
+                " order by per_ap desc limit 40",
+                (zid,),
+            )
+        ]
+    finally:
+        con.close()
+
+    return {
+        "zone_id": zid,
+        "name": row["zone_name"],
+        "type": row["zone_type"],
+        "stages": stages,
+        "drops": drops,
+        "has_data": len(drops) > 0,
     }

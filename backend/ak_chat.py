@@ -22,6 +22,10 @@ TALENT_WORDS = ("天赋",)
 STATS_WORDS = ("属性", "面板", "攻击力", "生命", "防御", "数据", "多少")
 MATERIAL_WORDS = ("材料", "素材", "精二", "精一", "专精", "需要什么")
 LIST_WORDS = ("有哪些", "推荐", "列举", "列表", "谁")
+# 掉落查询（2026-11-09，数据源企鹅物流）
+DROP_WORDS = ("掉", "刷", "关卡", "哪刷", "去哪", "在哪", "掉落", "理智")
+# 活动查询（2026-11-09）
+ACTIVITY_WORDS = ("活动", "最近开", "新活动", "什么活动", "活动关卡")
 
 # 中文数字
 CN_NUM = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6}
@@ -125,7 +129,36 @@ def _parse_skill_level(q: str) -> int | None:
     return None
 
 
+def _mentions_activity(q: str) -> bool:
+    """检查问句里是否提到已知活动名。"""
+    try:
+        con = _conn()
+        try:
+            rows = con.execute(
+                "select zone_name from zone where zone_type in ('ACTIVITY', 'ACTIVITY_PERMANENT')"
+            ).fetchall()
+        finally:
+            con.close()
+    except Exception:
+        return False
+
+    for r in rows:
+        name = r["zone_name"] or ""
+        if not name:
+            continue
+        base = name.split("・")[0]
+        if base and len(base) >= 2 and base in q:
+            return True
+    return False
+
+
 def classify_intent(q: str, op: dict | None, skill: dict | None) -> str:
+    # 活动查询最优先：命中「活动」词，或问句里含已知活动名
+    if any(w in q for w in ACTIVITY_WORDS) or _mentions_activity(q):
+        return "activity"
+    # 掉落查询：命中「刷/掉/关卡」等词，且不是问某个干员的材料
+    if any(w in q for w in DROP_WORDS) and not (op and any(w in q for w in MATERIAL_WORDS)):
+        return "drop"
     if any(w in q for w in LIST_WORDS) and not op:
         return "list"
     if skill or (op and any(w in q for w in SKILL_WORDS)):
@@ -228,6 +261,7 @@ SYSTEM_PROMPT = (
     "1. 只根据下面提供的资料回答，不要编造资料里没有的内容。\n"
     "2. 如果资料不足，直接说「资料里没有这部分」。\n"
     "3. 回答用中文，简洁，2-4 句话。\n"
+    "3b. 如果资料里标了【最优】或有序号，必须从第 1 名开始回答，不要跳过。\n"
     "4. 不要输出 Markdown 表格或代码块。"
 )
 
@@ -245,6 +279,12 @@ def prepare(q: str) -> tuple[dict, str]:
 
         if intent == "list":
             data.update(_handle_list(con, q))
+            lines.append(data.pop("_context", ""))
+        elif intent == "activity":
+            data.update(_handle_activity(con, q))
+            lines.append(data.pop("_context", ""))
+        elif intent == "drop":
+            data.update(_handle_drop(con, q))
             lines.append(data.pop("_context", ""))
         elif intent == "skill" and op:
             idx = _skill_index(q)
@@ -416,4 +456,192 @@ def _handle_list(con: sqlite3.Connection, q: str) -> dict:
             for r in rows
         ],
         "_context": f"{label}共 {len(names)} 个：{'、'.join(names[:20])}",
+    }
+
+def _material_candidates(q: str) -> list[str]:
+    """从问句里提取可能的材料名（去掉问句词）。"""
+    # 先按 data 表里的材料名匹配
+    con = _conn()
+    try:
+        names = [
+            r["item_name"]
+            for r in con.execute(
+                "select distinct item_name from drop_rate where item_name != ''"
+            )
+        ]
+    finally:
+        con.close()
+
+    hits = [n for n in names if n in q]
+    # 长的优先（避免「装置」抢在「聚酸酯装置」前）
+    hits.sort(key=len, reverse=True)
+    return hits
+
+
+def _handle_drop(con: sqlite3.Connection, q: str) -> dict:
+    """掉落查询：材料 -> 关卡，按每理智收益排序。"""
+    names = _material_candidates(q)
+
+    if not names:
+        # 没匹配到材料，给个提示
+        return {
+            "_context": (
+                "没有从问题里识别出材料名。可以这样问：\n"
+                "- 「固源岩在哪刷」\n"
+                "- 「装置哪个关卡掉得多」"
+            ),
+        }
+
+    target = names[0]
+    rows = con.execute(
+        "select stage_code, zone_name, ap_cost, quantity, times, drop_rate, per_ap"
+        " from drop_rate where item_name = ? and per_ap is not null"
+        " order by per_ap desc limit 10",
+        (target,),
+    ).fetchall()
+
+    total = con.execute(
+        "select count(*) from drop_rate where item_name = ? and per_ap is not null",
+        (target,),
+    ).fetchone()[0]
+
+    if not rows:
+        return {"_context": f"资料里没有「{target}」的掉落数据。"}
+
+    line_parts = [f"材料「{target}」的掉落（共 {total} 个关卡，按每理智收益从高到低）："]
+    for idx, r in enumerate(rows):
+        tag = "【最优】" if idx == 0 else ""
+        line_parts.append(
+            f"{idx+1}. {tag}{r['stage_code']}（{r['zone_name']}，{r['ap_cost']} 理智）："
+            f"期望 {r['drop_rate']:.2f} 个/次，每理智 {r['per_ap']:.4f} 个"
+        )
+    line_parts.append("回答时请按上面的顺序，先推荐第 1 名。")
+
+    return {
+        "_context": "\n".join(line_parts),
+        "drops": {
+            "item": target,
+            "total_stages": total,
+            "top": [
+                {
+                    "stage": r["stage_code"],
+                    "zone": r["zone_name"],
+                    "ap_cost": r["ap_cost"],
+                    "expected": round(r["drop_rate"], 3),
+                    "per_ap": round(r["per_ap"], 4),
+                    "samples": r["times"],
+                }
+                for r in rows
+            ],
+        },
+    }
+
+def _act_number(zone_id: str) -> int:
+    import re
+
+    m = re.search(r"act(\d+)", zone_id or "")
+    return int(m.group(1)) if m else -1
+
+
+def _handle_activity(con: sqlite3.Connection, q: str) -> dict:
+    """活动查询：列表 或 单个活动详情。"""
+    # 先看问句里有没有具体活动名
+    zone_rows = con.execute(
+        "select zone_id, zone_name, stage_count, drop_count from zone"
+        " where zone_type in ('ACTIVITY', 'ACTIVITY_PERMANENT')"
+    ).fetchall()
+
+    # 匹配活动名（问句里包含活动名的一段）
+    target = None
+    for r in zone_rows:
+        name = r["zone_name"] or ""
+        if not name:
+            continue
+        # 取活动名去掉「・复刻」等后缀的主体
+        base = name.split("・")[0]
+        if base and base in q:
+            target = r
+            break
+
+    if target:
+        # 单个活动详情
+        zid = target["zone_id"]
+        stages = con.execute(
+            "select stage_code, ap_cost from stage_info where zone_id = ? order by stage_code",
+            (zid,),
+        ).fetchall()
+        drops = con.execute(
+            "select item_name, stage_code, ap_cost, drop_rate, per_ap from drop_rate"
+            " where zone_id = ? and per_ap is not null order by per_ap desc limit 15",
+            (zid,),
+        ).fetchall()
+
+        if not drops:
+            return {
+                "_context": (
+                    f"活动「{target['zone_name']}」有 {len(stages)} 个关卡，"
+                    f"但企鹅物流没有它的掉落数据（可能已过期）。"
+                ),
+                "activity": {
+                    "name": target["zone_name"],
+                    "stages": [{"code": s["stage_code"], "ap": s["ap_cost"]} for s in stages],
+                    "has_data": False,
+                },
+            }
+
+        parts = [f"活动「{target['zone_name']}」共 {len(stages)} 个关卡，掉落如下（按每理智收益）："]
+        for d in drops:
+            parts.append(
+                f"{d['stage_code']}（{d['ap_cost']} 理智）：{d['item_name']} "
+                f"期望 {d['drop_rate']:.2f} 个/次，每理智 {d['per_ap']:.4f} 个"
+            )
+        return {
+            "_context": "\n".join(parts),
+            "activity": {
+                "name": target["zone_name"],
+                "stages": [{"code": s["stage_code"], "ap": s["ap_cost"]} for s in stages],
+                "has_data": True,
+                "drops": [
+                    {
+                        "item": d["item_name"],
+                        "stage": d["stage_code"],
+                        "ap_cost": d["ap_cost"],
+                        "expected": round(d["drop_rate"], 3),
+                        "per_ap": round(d["per_ap"], 4),
+                    }
+                    for d in drops
+                ],
+            },
+        }
+
+    # 没有具体活动名 -> 列最近的活动
+    items = [
+        {
+            "zone_id": r["zone_id"],
+            "name": r["zone_name"],
+            "act": _act_number(r["zone_id"]),
+            "stages": r["stage_count"],
+            "drops": r["drop_count"],
+            "has_data": r["drop_count"] > 0,
+        }
+        for r in zone_rows
+    ]
+    items.sort(key=lambda x: (-x["act"], -x["drops"]))
+
+    recent = items[:8]
+    with_data = [x for x in items if x["has_data"]]
+
+    parts = ["最近的活动："]
+    for x in recent:
+        mark = f"（{x['drops']} 条掉落数据）" if x["has_data"] else "（无掉落数据）"
+        parts.append(f"act{x['act']} {x['name']}，{x['stages']} 个关卡{mark}")
+
+    if with_data:
+        cur = with_data[0]
+        parts.append(f"\n当前有掉落数据的活动是「{cur['name']}」，可以问「{cur['name']}刷什么」。")
+
+    return {
+        "_context": "\n".join(parts),
+        "activities": recent,
+        "current_with_data": [x["name"] for x in with_data[:3]],
     }
