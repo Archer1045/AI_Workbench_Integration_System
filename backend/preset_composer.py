@@ -232,6 +232,82 @@ def _check_conflicts(selected_ids: list[str]) -> None:
             raise ComposeError(f"预设冲突：{sorted(pair)}")
 
 
+# ── 标签级冲突检测（M2，2026-11-10） ──
+# 与 _check_conflicts 的区别：
+# - _check_conflicts 是预设 ID 级，硬阻断（raise ComposeError）
+# - _check_tag_conflicts 是标签级，软警告（返回 warnings + 建议）
+
+# 互斥标签对：(A 组, B 组, 说明, 建议)
+_TAG_CONFLICT_RULES: tuple[tuple[frozenset[str], frozenset[str], str, str], ...] = (
+    (
+        frozenset({"lying prone", "prone", "lying face down"}),
+        frozenset({"far leg raised", "pelvis toward partner", "raised hips"}),
+        "俯卧和抬腿朝向对方在几何上冲突，模型只能二选一",
+        "建议改用 lying on side，或去掉 far leg raised",
+    ),
+    (
+        frozenset({"head turned back", "looking back"}),
+        frozenset({"looking at partner", "looking at viewer", "eye contact"}),
+        "回头和看对方/看镜头是互斥的朝向",
+        "建议二选一：要回头就写 looking back，要交流就写 looking at partner",
+    ),
+    (
+        frozenset({"standing", "standing up", "on feet"}),
+        frozenset({"lying", "prone", "supine", "lying on back", "lying on side", "on back"}),
+        "站立和躺卧互斥",
+        "建议只保留一个姿势标签",
+    ),
+    (
+        frozenset({"sitting", "seated", "kneeling"}),
+        frozenset({"standing", "standing up", "on feet"}),
+        "坐/跪和站立互斥",
+        "建议只保留一个姿势标签",
+    ),
+    (
+        frozenset({"from behind", "from back"}),
+        frozenset({"facing viewer", "looking at viewer", "face to face"}),
+        "背后视角和面向观众/面对面前冲突",
+        "建议二选一",
+    ),
+    (
+        frozenset({"eyes closed", "closed eyes"}),
+        frozenset({"looking at viewer", "looking at partner", "eye contact"}),
+        "闭眼和视线交互互斥",
+        "如果强调表情交流，去掉 eyes closed",
+    ),
+    (
+        frozenset({"spread legs"}),
+        frozenset({"legs together", "closed legs"}),
+        "腿分开和并拢互斥",
+        "建议只保留一个",
+    ),
+)
+
+
+def _normalize_tags_for_conflict(prompt: str) -> str:
+    """把提示词转成小写、去标点的字符串，便于子串匹配。"""
+    import re
+
+    return re.sub(r"[^a-z0-9,\- ]", " ", prompt.lower())
+
+
+def _check_tag_conflicts(prompt: str) -> list[str]:
+    """检测标签级冲突，返回警告列表（带修正建议）。
+
+    只做警告，不修改提示词（用户 2026-11-10 确认「警告 + 建议」）。
+    """
+    norm = _normalize_tags_for_conflict(prompt)
+    warnings: list[str] = []
+    for group_a, group_b, reason, suggestion in _TAG_CONFLICT_RULES:
+        hit_a = [t for t in group_a if t in norm]
+        hit_b = [t for t in group_b if t in norm]
+        if hit_a and hit_b:
+            warnings.append(
+                f"检测到冲突：{', '.join(hit_a)} 与 {', '.join(hit_b)} —— {reason}。{suggestion}"
+            )
+    return warnings
+
+
 def compose_presets(payload: dict, *, restriction_enabled: bool = False) -> dict:
     """Validate and compose a preset-only prompt.
 
@@ -459,6 +535,8 @@ def compose_presets(payload: dict, *, restriction_enabled: bool = False) -> dict
         warnings.append("组合包含 R18 预设")
     if dropped_tags:
         warnings.append(f"提示词超出 CLIP 预算，已裁剪 {len(dropped_tags)} 个 tag")
+    # 标签级冲突检测（M2，2026-11-10）
+    warnings.extend(_check_tag_conflicts(prompt))
 
     return {
         "prompt": prompt,
