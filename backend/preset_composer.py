@@ -375,24 +375,77 @@ def compose_presets(payload: dict, *, restriction_enabled: bool = False) -> dict
             tagged_fragments.append((prompt_budget.P2, "empty surroundings, no other people"))
 
     # 每个角色的第一件服装算 P1（保证每个角色都有衣着描述），其余算 P2
-    seen_scope: set[str] = set()
-    for item in selected:
-        fragment = _scoped_fragment(item["preset"], item["scope"])
-        color_terms = [
-            f"{slot} color {value}"
-            for slot, value in item["colors"].items()
-            if value
-        ]
-        if color_terms:
-            fragment = f"{fragment}, {', '.join(color_terms)}"
-        # 用原始 scope 字符串做 key（canonical 会把 角色A/角色B 都归一成 all）
-        scope_key = str(item["scope"]).strip().lower()
-        if scope_key not in seen_scope:
-            priority = prompt_budget.P1
-            seen_scope.add(scope_key)
-        else:
-            priority = prompt_budget.P2
-        tagged_fragments.append((priority, fragment))
+    # 2026-11-10：默认按 scope 分组合并（compact），把「每部位一条」改成「每角色一句」
+    compact = payload.get("compact_prompt")
+    if compact is None:
+        compact = True
+
+    if compact:
+        # 按 scope 分组，每组内 fragment 用逗号拼接
+        grouped: dict[str, list[str]] = {}
+        scope_order: list[str] = []
+        for item in selected:
+            fragment = _fragment(item["preset"])
+            color_terms = [
+                f"{slot} color {value}"
+                for slot, value in item["colors"].items()
+                if value
+            ]
+            if color_terms:
+                fragment = f"{fragment}, {', '.join(color_terms)}"
+            scope_key = str(item["scope"]).strip().lower()
+            if scope_key not in grouped:
+                grouped[scope_key] = []
+                scope_order.append(scope_key)
+            grouped[scope_key].append(fragment)
+
+        for idx, scope_key in enumerate(scope_order):
+            fragments = grouped[scope_key]
+            # 合并时去掉重复的 "wearing " 前缀（只保留第一个）
+            cleaned: list[str] = []
+            has_wearing = False
+            for frag in fragments:
+                if has_wearing and frag.startswith("wearing "):
+                    cleaned.append(frag[len("wearing "):])
+                else:
+                    if frag.startswith("wearing "):
+                        has_wearing = True
+                    cleaned.append(frag)
+            merged = ", ".join(cleaned)
+            # 用原始 scope 的显示形式（保留大小写）
+            scope_display = scope_key
+            for item in selected:
+                if str(item["scope"]).strip().lower() == scope_key:
+                    scope_display = str(item["scope"]).strip()
+                    break
+            canonical = _canonical_scope(scope_key)
+            if canonical == "all":
+                final = merged
+            else:
+                final = f"for {scope_display}: {merged}"
+            # 每个 scope 的第一组算 P1
+            priority = prompt_budget.P1 if idx == 0 else prompt_budget.P2
+            tagged_fragments.append((priority, final))
+    else:
+        # 旧格式：每个 preset 单独一条
+        seen_scope: set[str] = set()
+        for item in selected:
+            fragment = _scoped_fragment(item["preset"], item["scope"])
+            color_terms = [
+                f"{slot} color {value}"
+                for slot, value in item["colors"].items()
+                if value
+            ]
+            if color_terms:
+                fragment = f"{fragment}, {', '.join(color_terms)}"
+            # 用原始 scope 字符串做 key（canonical 会把 角色A/角色B 都归一成 all）
+            scope_key = str(item["scope"]).strip().lower()
+            if scope_key not in seen_scope:
+                priority = prompt_budget.P1
+                seen_scope.add(scope_key)
+            else:
+                priority = prompt_budget.P2
+            tagged_fragments.append((priority, fragment))
 
     prompt, dropped_tags = prompt_budget.trim_fragments(tagged_fragments)
     blocked_text = content_filter.is_hard_blocked(prompt)
